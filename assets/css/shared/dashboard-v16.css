@@ -139,7 +139,6 @@ body[data-dashboard] a,body[data-dashboard] a *,body[data-dashboard] u,body[data
   .v16-card-icon .v16-icon { width:23px; height:23px }
   .mcard[data-v16-group=media] .v16-card-icon { background:#eaf1fc; color:#6d90ba }
   .mcard[data-v16-group=admin] .v16-card-icon { background:#f9eee2; color:#aa8355 }
-  body[data-dashboard=index] #portal .mcard::after { content:'↗'; position:absolute; top:26px; right:23px; font-size:16px; color:#b1a6bc }
   .v16-no-results { padding:40px 20px; border:1px dashed #d9cce9; border-radius:16px; text-align:center; color:var(--v16-muted); background:#fff }
   body[data-dashboard] :is(.workspace-nav,.tabs,.cnav,#sTabs) { display:flex; flex-wrap:wrap; width:fit-content; max-width:100%; gap:4px; background:#eeE9f5;
     border:1px solid #e8e0f1; padding:5px; border-radius:12px; box-shadow:none; position:static; transform:none }

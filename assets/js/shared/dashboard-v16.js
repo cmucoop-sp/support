@@ -39,8 +39,6 @@
     {key:'sound',label:'เสียงประกาศ',group:'media'},
     {key:'music',label:'เพลงและคิวเพลง',group:'media'},
     {key:'tv',label:'หน้าจอ TV',group:'media',icon:'tv',publicPage:true},
-    {key:'receiver',label:'ตัวรับเสียงประกาศ',group:'media',icon:'receiver',publicPage:true},
-    {key:'banner',label:'แบนเนอร์โฆษณา',group:'media',icon:'banner',publicPage:true},
     {key:'settings',label:'ตั้งค่าระบบ',group:'admin'}
   ];
   var sidebar = document.createElement('aside');

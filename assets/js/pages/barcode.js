@@ -623,7 +623,7 @@ function fixedWidths(ctx, sc, rows, tw) {
   return sc.cols.map(function (k, j) { return { k: k, w: need[j] }; });
 }
 
-function layoutSection(ctx, d, partners) {
+function layoutSection(ctx, d, partners, compact) {
   var c = S.cats.filter(function (x) { return x.sheet === d.sheet && x.cat === d.cat; })[0];
   var sc = c ? schemaOfCat(c) : S.schemas[S.sheets[d.sheet].schema], h = d.header;
   var chosen = Array.isArray(partners) ? partners : selectedPartners(), ip = sc.cols.map(function (k) { return k.k; }).indexOf('partner');
@@ -641,27 +641,48 @@ function layoutSection(ctx, d, partners) {
   var HEAD_H = 22;
   var FOOT_H = 10;
   var bodyTop1 = PDF_M + TOP_H + HEAD_H, bodyTopN = PDF_M + HEAD_H, bodyBot = PDF_H - PDF_M - FOOT_H;
-  var bpt = PDF_BODY;
   var hpt = PDF_BODY;
-  LH = bpt * 0.3528 * 1.25 * PX; MINH = Math.max(7 * PX, LH + 2.4 * PX);
-  var items = rows.map(function (x, ri) {
-    var cells = x.v.map(function (v, j) {
-      var k = cols[j].k, maxW = cols[j].w * PX - padX * 2;
-      if (k.text) return { lines: [String(v)], pt: bpt };
-      pdfFont(ctx, bpt, false);
-      return { lines: wrapText(ctx, v, maxW), pt: bpt };
+  var MIN_NEXT = 5, MIN_SCALE = 0.8;
+  function paginate(scale) {
+    var bpt = PDF_BODY * scale;
+    LH = bpt * 0.3528 * 1.25 * PX; MINH = Math.max(7 * PX * scale, LH + 2.4 * PX * scale);
+    var items = rows.map(function (x, ri) {
+      var cells = x.v.map(function (v, j) {
+        var k = cols[j].k, maxW = cols[j].w * PX - padX * 2;
+        if (k.text) return { lines: [String(v)], pt: bpt };
+        pdfFont(ctx, bpt, false);
+        return { lines: wrapText(ctx, v, maxW), pt: bpt };
+      });
+      var nl = Math.max.apply(null, cells.map(function (c) { return c.lines.length; }));
+      return { cells: cells, h: Math.max(MINH, nl * LH + 2.4 * PX * scale), n: ri };
     });
-    var nl = Math.max.apply(null, cells.map(function (c) { return c.lines.length; }));
-    return { cells: cells, h: Math.max(MINH, nl * LH + 2.4 * PX), n: ri };
-  });
-  var pages = [], cur = null, y = 0;
-  function newPage(first) { cur = { first: first, rows: [] }; pages.push(cur); y = (first ? bodyTop1 : bodyTopN) * PX; }
-  newPage(true);
-  items.forEach(function (it) {
-    if (y + it.h > bodyBot * PX && cur.rows.length) newPage(false);
-    cur.rows.push({ it: it, y: y }); y += it.h;
-  });
-  return { sc: sc, cols: cols, top: topLines, hasCo: !!h.company, pages: pages, empty: !items.length, headH: HEAD_H, topH: TOP_H, hpt: hpt };
+    var pgs = [], cur = null, y = 0;
+    function newPage(first) { cur = { first: first, rows: [] }; pgs.push(cur); y = (first ? bodyTop1 : bodyTopN) * PX; }
+    newPage(true);
+    items.forEach(function (it) {
+      if (y + it.h > bodyBot * PX && cur.rows.length) newPage(false);
+      cur.rows.push({ it: it, y: y }); y += it.h;
+    });
+    return pgs;
+  }
+  var pages = paginate(1);
+  if (compact && pages.length > 1 && pages[pages.length - 1].rows.length < MIN_NEXT) {
+    /* ล้นไปหน้าถัดไปไม่ถึง 5 แถว: ลดขนาดตัวอักษร/ความสูงแถวลงทีละน้อยให้พอดีหน้าเดิม */
+    for (var sc2 = 0.98; sc2 >= MIN_SCALE - 1e-9; sc2 -= 0.02) {
+      var tryPages = paginate(sc2);
+      if (tryPages.length < pages.length || tryPages[tryPages.length - 1].rows.length >= MIN_NEXT) { pages = tryPages; break; }
+    }
+    /* ถ้าบีบจนถึงขีดจำกัดแล้วยังไม่พอ: ย้ายแถวท้ายหน้าก่อนหน้ามาให้หน้าสุดท้ายมีอย่างน้อย 5 แถว */
+    var last = pages[pages.length - 1], prev = pages[pages.length - 2];
+    if (pages.length > 1 && last.rows.length < MIN_NEXT && prev) {
+      var move = Math.min(MIN_NEXT - last.rows.length, prev.rows.length - 1);
+      if (move > 0) {
+        var moved = prev.rows.splice(prev.rows.length - move, move).concat(last.rows), yy = bodyTopN * PX;
+        last.rows = moved.map(function (r) { var o = { it: r.it, y: yy }; yy += r.it.h; return o; });
+      }
+    }
+  }
+  return { sc: sc, cols: cols, top: topLines, hasCo: !!h.company, pages: pages, empty: !rows.length, headH: HEAD_H, topH: TOP_H, hpt: hpt };
 }
 
 function drawPage(ctx, W, H, L, pg, pageNo, pageTotal, printedAt) {
@@ -797,7 +818,7 @@ async function buildPrintPdf(results) {
   var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   var ctx = cv.getContext('2d');
   if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
-  var layouts = results.map(function (d) { return layoutSection(ctx, d); });
+  var layouts = results.map(function (d) { return layoutSection(ctx, d, undefined, true); });
   var total = layouts.reduce(function (s, L) { return s + L.pages.length; }, 0), no = 0, jp = [], at = fmt(nowMs());
   for (var a = 0; a < layouts.length; a++) {
     for (var b = 0; b < layouts[a].pages.length; b++) {
