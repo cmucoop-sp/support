@@ -1,0 +1,15 @@
+# CMUCOOP API (Cloudflare Worker + D1)
+# หมายเหตุความปลอดภัย: ห้ามใส่คีย์ลับ (Secrets) หรือ database_id จริงลงในไฟล์ที่ commit ขึ้น GitHub สาธารณะ
+# ให้ตั้งค่า Secrets (RECOVERY_SALT, RECOVERY_HASH, SESSION_SECRET, LINK_SECRET, INIT_ADMIN_PASSWORD)
+# ใน Cloudflare Dashboard -> Workers & Pages -> cmucoop-api -> Settings -> Variables and Secrets
+name = "cmucoop-api"
+main = "index.js"
+compatibility_date = "2025-09-01"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cmucoop"
+database_id = "YOUR_D1_DATABASE_ID"
