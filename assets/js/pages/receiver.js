@@ -334,22 +334,31 @@ function checkInternalSchedule() {
   if (!CFGD) return;
   var now = new Date(), h = now.getHours(), m = now.getMinutes(), cur = pad(h) + ':' + pad(m);
   if (cur === lastPlayedTimeStr) return;
-  var key = null, found = false;
+  var key = null, found = false, matchedRep = null;
   CFGD.schedule.forEach(function (s) { if (s.time === cur) { key = s.key; found = true; } });
-  if (!found && CFGD.daytime && CFGD.daytime.on) {
+  if (!found) {
+    var list = Array.isArray(CFGD.repeats) ? CFGD.repeats : (CFGD.daytime && CFGD.daytime.on ? [CFGD.daytime] : []);
     var tm = h * 60 + m;
-    var startMin = parseHHMM(CFGD.daytime.start, 540);
-    var endMin = parseHHMM(CFGD.daytime.end, 1140);
-    var interval = Math.max(1, parseInt(CFGD.daytime.interval, 10) || 30);
-    var inRange = startMin <= endMin ? (tm >= startMin && tm <= endMin) : (tm >= startMin || tm <= endMin);
-    var elapsed = tm >= startMin ? (tm - startMin) : (1440 - startMin + tm);
-    if (inRange && elapsed % interval === 0) key = String(CFGD.daytime.key || '3');
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (!r || !r.key) continue;
+      var startMin = parseHHMM(r.start, 540);
+      var endMin = parseHHMM(r.end, 1140);
+      var interval = Math.max(1, parseInt(r.interval, 10) || 30);
+      var inRange = startMin <= endMin ? (tm >= startMin && tm <= endMin) : (tm >= startMin || tm <= endMin);
+      var elapsed = tm >= startMin ? (tm - startMin) : (1440 - startMin + tm);
+      if (inRange && elapsed % interval === 0) {
+        key = String(r.key);
+        matchedRep = r;
+        break;
+      }
+    }
   }
   if (!key) return;
   lastPlayedTimeStr = cur;
   var it = findItem(key);
   if (!it) return;
-  var logKind = found ? 'ตามตารางเวลา' : 'ประกาศซ้ำ (' + (CFGD.daytime && CFGD.daytime.start || '09:00') + '–' + (CFGD.daytime && CFGD.daytime.end || '19:00') + ')';
+  var logKind = found ? 'ตามตารางเวลา' : 'ประกาศซ้ำ (' + (matchedRep && matchedRep.start || '09:00') + '–' + (matchedRep && matchedRep.end || '19:00') + ')';
   try { google.script.run.withFailureHandler(function () {}).soundScheduleLog(cur, key, logKind, isPlayingBusy); } catch (e) {}
   triggerAnnouncement(it.id, true, it.label, 1, 0);
 }
