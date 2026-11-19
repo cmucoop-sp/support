@@ -14,7 +14,7 @@
 <base target="_top"/>
 <link href="assets/css/shared/fonts.css?v=16.2" rel="stylesheet"/>
 <script src="assets/vendor/mqtt.min.js"></script>
-<link rel="stylesheet" href="assets/css/pages/settings.css?v=16.8">
+<link rel="stylesheet" href="assets/css/pages/settings.css?v=16.10">
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/shared/app.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/pages/tv-designer.css?v=16.2" rel="stylesheet"/>
@@ -206,17 +206,19 @@
 </div>
 <div class="cpanel hidden" id="cp-sch" style="display:grid;gap:14px">
 <div class="card">
-<div class="cardrow"><h3>ตารางเวลาประกาศอัตโนมัติ</h3><button class="btn small" id="sAddSch">+ เพิ่มเวลา</button></div>
-<div class="muted" style="margin-bottom:8px">ถึงเวลาที่ตั้ง TV จะเล่นเสียงที่เลือกเองอัตโนมัติ · แก้ไขได้ทั้งเวลา และเลข/ไฟล์เสียงที่จะประกาศ</div>
+<div class="cardrow"><h3>ตารางเวลาประกาศอัตโนมัติ</h3><button class="btn small" id="sAddSch">+ เพิ่มประกาศตามเวลา</button></div>
+<div class="muted" style="margin-bottom:8px">ถึงเวลาที่ตั้ง TV จะเล่นเสียงที่เลือกเองอัตโนมัติ · เลือกเสียงและกำหนดหลายเวลาที่จะประกาศได้ในครั้งเดียว หรือแก้ไขแต่ละรายการได้</div>
 <div style="overflow:auto"><table class="logt"><thead><tr><th>เวลา</th><th>เลขเสียงที่ประกาศ</th><th>ไฟล์เสียง</th><th>สถานะ</th><th></th></tr></thead><tbody id="sBodySch"></tbody></table></div>
 </div>
 <div class="card">
-<h3>ประกาศซ้ำช่วงกลางวัน (09:00–19:00)</h3>
-<div class="muted" style="margin-bottom:8px">เล่นเสียงที่เลือกซ้ำตามช่วงนาทีที่กำหนด</div>
+<h3 id="dtHeading">ประกาศซ้ำอัตโนมัติ (09:00–19:00)</h3>
+<div class="muted" style="margin-bottom:8px">เล่นเสียงที่เลือกซ้ำในช่วงเวลาที่กำหนด ตามรอบนาทีที่ตั้งไว้</div>
 <div class="row">
-<label style="width:150px">สถานะ<select id="dtOn"><option value="ใช้งาน">เปิดใช้งาน</option><option value="ปิด">ปิด</option></select></label>
+<label style="width:140px">สถานะ<select id="dtOn"><option value="ใช้งาน">เปิดใช้งาน</option><option value="ปิด">ปิด</option></select></label>
 <label style="min-width:220px;flex:1">เสียงที่จะเล่น (เลข / ไฟล์)<select id="dtKey"></select></label>
-<label style="width:150px">ทุกกี่นาที<input autocomplete="off" id="dtInt" inputmode="numeric" type="text"/></label>
+<label style="width:130px">ตั้งแต่เวลา<input id="dtStart" type="time" value="09:00"/></label>
+<label style="width:130px">ถึงเวลา<input id="dtEnd" type="time" value="19:00"/></label>
+<label style="width:120px">ทุกกี่นาที<input autocomplete="off" id="dtInt" inputmode="numeric" min="1" max="720" type="number" value="30"/></label>
 <button class="btn" id="dtSave" style="align-self:end">บันทึก</button>
 </div>
 </div>
@@ -270,12 +272,21 @@
 </div>
 </div>
 <div class="modalwrap hidden" id="schModal">
-<div class="modal" style="width:min(460px,100%)">
-<h3 id="schTitle">เพิ่มเวลาประกาศ</h3>
+<div class="modal" style="width:min(520px,100%)">
+<h3 id="schTitle">เพิ่มประกาศตามเวลา</h3>
 <div class="grid">
-<label>เวลา<input id="schTime" type="time"/></label>
-<label>สถานะ<select id="schStatus"><option value="ใช้งาน">ใช้งาน</option><option value="ปิด">ปิด (ไม่เล่น)</option></select></label>
 <label class="wide">เสียงที่จะประกาศ (เลข / ไฟล์)<select id="schKey"></select></label>
+<label id="schSingleWrap" class="hidden">เวลา<input id="schTime" type="time"/></label>
+<label>สถานะ<select id="schStatus"><option value="ใช้งาน">ใช้งาน</option><option value="ปิด">ปิด (ไม่เล่น)</option></select></label>
+</div>
+<div id="schMultiWrap">
+<label>เลือกเวลาที่จะประกาศเสียงนี้ (เพิ่มได้หลายเวลา)</label>
+<div class="row" style="margin-top:4px">
+<input id="schTimeAdd" type="time" style="width:150px"/>
+<button class="btn ghost small" id="schTimeAddBtn" type="button">+ เพิ่มเวลานี้</button>
+<span class="muted" id="schTimeCount"></span>
+</div>
+<div class="sch-chips" id="schTimeChips"></div>
 </div>
 <div class="addbar"><button class="btn" id="schSave">บันทึก</button><button class="btn ghost" id="schCancel">ยกเลิก</button></div>
 </div>
@@ -334,7 +345,7 @@
 </div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/user-link-qr.js?v=16.8"></script>
-<script src="assets/js/pages/settings.js?v=16.9"></script>
+<script src="assets/js/pages/settings.js?v=16.10"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

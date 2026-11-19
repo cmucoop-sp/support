@@ -13,7 +13,7 @@
     ['m3', '1–3 เดือน', 'เกิน 1 ถึง 3 เดือน'], ['m6', '3–6 เดือน', 'เกิน 3 ถึง 6 เดือน'], ['m12', '6 เดือน–ไม่ถึง 1 ปี', 'เกิน 6 เดือน'], ['later', '1 ปีขึ้นไป', 'ตั้งแต่ 1 ปี']
   ];
   const labels = Object.fromEntries(ranges.map(([key, title]) => [key, title]));
-  const statusLabels = { active: 'ยังไม่รับทราบ', acknowledged: 'รับทราบแล้ว', closed: 'ปิดแจ้งเตือนแล้ว' };
+  const statusLabels = { active: 'รอตรวจสอบ', acknowledged: 'รอตรวจสอบ', closed: 'ตรวจสอบแล้ว' };
   let token = '', user = null, data = null, bucket = 'all', page = 1, loadSeq = 0, lookupSeq = 0, historySeq = 0, timer, searchTimer, toastTimer, formState = null, saving = false;
   let formLocked = false, catalog = null, catalogError = '', matches = [], productSelection = null, manualMode = false, lookupTimer;
   const pad = n => String(n).padStart(2, '0');
@@ -110,7 +110,7 @@
     finally { $('#password').value = ''; button.disabled = false; }
   });
   $('#logout').addEventListener('click', async () => { try { await call('logout'); } catch (_) {} showLogin(); });
-  function options() { return { page, bucket, q: $('#search').value.trim(), branch: $('#branchFilter').value, state: $('#stateFilter').value }; }
+  function options() { return { page, bucket, q: $('#search').value.trim(), branch: $('#branchFilter').value, state: $('#stateFilter').value, sort: $('#sortFilter').value }; }
   async function load(quiet = false) {
     if (!token || !user) return;
     const seq = ++loadSeq, requestToken = token, request = { ...options(), refreshId: seq };
@@ -155,15 +155,14 @@
     let actions = action('ประวัติ', 'history');
     if (data.me.edit) {
       actions = action('แก้ไข', 'edit') + actions;
-      if (r.status === 'active') actions += action('รับทราบ', 'acknowledged');
-      actions += r.status === 'closed' ? action('เปิดอีกครั้ง', 'active') : action('ปิดแจ้งเตือน', 'closed', 'close');
+      actions += r.status === 'closed' ? action('เปิดอีกครั้ง', 'active') : action('ตรวจสอบแล้ว', 'closed', 'checked');
       actions += action('ลบรายการ', 'delete', 'delete');
     }
     return '<tr><td data-label="ล็อต"><span class="lot-number">' + esc(r.lot) + '</span><small>' + time(r.createdTs) + '</small><small>' + esc(r.createdBy) + '</small></td>' +
       '<td data-label="สินค้า"><div class="product">' + esc(r.name) + '</div><small class="barcode">' + esc(r.barcode || 'ไม่ได้ระบุบาร์โค้ด') + '</small>' + (r.note ? '<small>' + esc(r.note.slice(0, 70)) + '</small>' : '') + '</td>' +
       '<td data-label="สาขา / จุดวาง">' + esc(r.branch) + '<small>' + esc(r.location || 'ไม่ระบุจุดวาง') + '</small></td>' +
       '<td data-label="วันหมดอายุ">' + date(r.expires) + '<small><span class="badge ' + r.bucket + '">' + dayText + '</span></small></td>' +
-      '<td data-label="จำนวน">' + quantity + '</td><td data-label="สถานะ"><span class="badge ' + r.status + '">' + statusLabels[r.status] + '</span></td>' +
+      '<td data-label="จำนวน">' + quantity + '</td><td data-label="สถานะ"><span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบ') + '</span></td>' +
       '<td data-label="จัดการ"><div class="actions">' + actions + '</div></td></tr>';
   }
   function selectBucket(key) { bucket = key; page = 1; $('#stateFilter').value = 'open'; load(); }
@@ -172,6 +171,7 @@
   $('#search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page = 1; load(); }, 250); });
   $('#branchFilter').addEventListener('change', () => { page = 1; load(); });
   $('#stateFilter').addEventListener('change', () => { page = 1; bucket = 'all'; load(); });
+  $('#sortFilter').addEventListener('change', () => { page = 1; load(); });
   $('#refresh').addEventListener('click', () => load()); $('#prev').addEventListener('click', () => { page--; load(); }); $('#next').addEventListener('click', () => { page++; load(); });
   let locationBusy=false,locationSequence=0;
   function renderLocations(selected=$('#location').value) {
@@ -360,9 +360,9 @@
       finally { button.disabled = false; }
       return;
     }
-    if (action === 'closed' && !confirm('ปิดแจ้งเตือน ' + row.lot + ' (' + row.name + ')?\nล็อตอื่นยังแจ้งเตือนตามเดิม และล็อตนี้ยังดูประวัติหรือเปิดอีกครั้งได้')) return;
+    if (action === 'closed' && !confirm('ยืนยันตรวจสอบแล้ว ' + row.lot + ' (' + row.name + ')?\nล็อตอื่นยังแจ้งเตือนตามเดิม และล็อตนี้ยังดูประวัติหรือเปิดอีกครั้งได้')) return;
     button.disabled = true;
-    try { await call('expirySetStatus', row.id, row.version, action); toast(action === 'closed' ? 'ปิดแจ้งเตือนเฉพาะ ' + row.lot + ' แล้ว' : action === 'acknowledged' ? 'รับทราบแล้ว ล็อตนี้ยังแจ้งเตือนต่อจนกว่าจะปิด' : 'เปิดแจ้งเตือนอีกครั้งแล้ว'); await load(); }
+    try { await call('expirySetStatus', row.id, row.version, action); toast(action === 'closed' ? 'ทำเครื่องหมายตรวจสอบแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว'); await load(); }
     catch (e) { toast(e.message, true); await load(true); }
     finally { button.disabled = false; }
   });

@@ -207,7 +207,7 @@ var PERM_LABELS = {
   market: 'เช็คราคาตลาด (ดู)',
   market_edit: 'เช็คราคาตลาด: แก้ไขได้ (ไม่ติ๊ก = ดูอย่างเดียว)',
   expiry: 'แจ้งเตือนสินค้าหมดอายุ (ดู)',
-  expiry_edit: 'แจ้งเตือนสินค้าหมดอายุ: เพิ่ม/แก้ไข/รับทราบ/ปิดล็อต',
+  expiry_edit: 'แจ้งเตือนสินค้าหมดอายุ: เพิ่ม/แก้ไข/ตรวจสอบแล้ว/ลบรายการ',
   assets: 'รายการสินทรัพย์ (ดู)',
   assets_edit: 'รายการสินทรัพย์: เพิ่ม/แก้ไข/ลบ และแก้ชื่อตาราง'
 };
@@ -660,7 +660,7 @@ $('#bCopyEmbed').addEventListener('click', function () { copyField('#bEmbed', '�
 
 
 /* ============================ ตั้งค่าเสียงประกาศ (Admin) ============================ */
-var SND = { client: null, all: [], edit: null, editSch: null };
+var SND = { client: null, all: [], edit: null, editSch: null, schTimes: [] };
 var MU = { avol: 100, avDrag: false, MQ: 'cmucoop/audio/control/music_v1' };
 var SND_TYPES = ['ปุ่ม', 'เสียงตามเวลา', 'ระบบ', 'พนักงาน', 'สถานที่', 'แคชเชียร์', 'ประเภทงดรับ', 'เวลา', 'ตั้งค่า'];
 var SND_HINT = {
@@ -672,7 +672,7 @@ var SND_HINT = {
   'แคชเชียร์': 'รหัส = ชื่อช่อง เช่น แคชเชียร์ 1 · ไฟล์ = เสียงอ่านชื่อช่อง',
   'ประเภทงดรับ': 'รหัส = ประเภท เช่น งดรับเงินสด · ไฟล์ = เสียงประกาศประเภทนั้น',
   'เวลา': 'ตารางเวลาอัตโนมัติบน TV · รหัส = เวลา HH:MM · ค่าเพิ่มเติม = รหัสเสียงที่จะเล่น (เช่น 1930)',
-  'ตั้งค่า': 'รหัส daytime = ประกาศรหัส 3 ช่วง 09:00-19:00 · ค่าเพิ่มเติม = ทุกกี่นาที (เช่น 30) · สถานะ ปิด = ไม่ประกาศ'
+  'ตั้งค่า': 'daytime = ทุกกี่นาที · daytimeStart/daytimeEnd = ช่วงเวลาเริ่ม–สิ้นสุด (HH:MM) · daytimeKey = รหัสเสียง'
 };
 function sndNeedFile(t) { return t !== 'เวลา' && t !== 'ตั้งค่า'; }
 
@@ -733,7 +733,13 @@ function sndRenderAdmin() {
     return '<tr><td>' + esc(x.type) + '</td><td>' + esc(x.code) + '</td><td>' + esc(x.label) + '</td><td>' + esc(x.value) + '</td><td>' + sndFile(x) + '</td>' + sndSt(x) + sndActs(x) + '</tr>';
   }, 7, 'ไม่มีรายการ');
   var d = A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytime'; })[0];
+  var ds = A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytimeStart'; })[0];
+  var de = A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytimeEnd'; })[0];
+  var sv = ds && /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(ds.value) ? ds.value : '09:00';
+  var ev = de && /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(de.value) ? de.value : '19:00';
   $('#dtOn').value = d && !d.on ? 'ปิด' : (d ? 'ใช้งาน' : 'ปิด'); $('#dtInt').value = d ? d.value : '30';
+  $('#dtStart').value = sv; $('#dtEnd').value = ev;
+  if ($('#dtHeading')) $('#dtHeading').textContent = 'ประกาศซ้ำอัตโนมัติ (' + sv + '–' + ev + ')';
   var dk = A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytimeKey'; })[0], kv = dk && dk.value ? dk.value : '3';
   $('#dtKey').innerHTML = sndKeyOptions(kv); $('#dtKey').value = kv;
 }
@@ -745,33 +751,90 @@ $('#cfgNav').addEventListener('click', function (e) { var b = e.target.closest('
 
 async function sndReload() { await sndLoadAdmin(); }
 $('#dtSave').addEventListener('click', function () {
-  var d = SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytime'; })[0];
+  var st = $('#dtStart').value.trim(), en = $('#dtEnd').value.trim(), iv = $('#dtInt').value.trim();
+  var hhmm = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+  if (!hhmm.test(st) || !hhmm.test(en)) { toast('กรุณาเลือกเวลาเริ่มต้นและเวลาสิ้นสุดให้ถูกต้อง', true); return; }
+  if (!(Number(iv) >= 1 && Number(iv) <= 720)) { toast('ช่วงนาทีต้องอยู่ระหว่าง 1–720 นาที', true); return; }
+  var findCfg = function (code) { return SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === code; })[0]; };
+  var d = findCfg('daytime'), dk = findCfg('daytimeKey'), ds = findCfg('daytimeStart'), de = findCfg('daytimeEnd');
   busy(this, async function () {
-    await call('saveSound', { row: d ? d.row : 0, type: 'ตั้งค่า', code: 'daytime', label: d ? d.label : 'ประกาศช่วง 09:00-19:00 (เล่นเสียงรหัส 3) ค่าเพิ่มเติม = ทุกกี่นาที',
-                              value: $('#dtInt').value.trim(), status: $('#dtOn').value });
-    var dk = SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === 'daytimeKey'; })[0];
-    await call('saveSound', { row: dk ? dk.row : 0, type: 'ตั้งค่า', code: 'daytimeKey', label: 'เสียงที่เล่นในช่วงประกาศซ้ำกลางวัน (ค่าเพิ่มเติม = รหัสเสียง)', value: $('#dtKey').value, status: 'ใช้งาน' });
-    toast('บันทึกแล้ว'); await sndReload();
+    await call('saveSound', { row: d ? d.row : 0, type: 'ตั้งค่า', code: 'daytime', label: 'ประกาศซ้ำช่วง ' + st + '–' + en + ' (ค่าเพิ่มเติม = ทุกกี่นาที)', value: iv, status: $('#dtOn').value });
+    await call('saveSound', { row: dk ? dk.row : 0, type: 'ตั้งค่า', code: 'daytimeKey', label: 'เสียงที่เล่นในช่วงประกาศซ้ำ (ค่าเพิ่มเติม = รหัสเสียง)', value: $('#dtKey').value, status: 'ใช้งาน' });
+    await call('saveSound', { row: ds ? ds.row : 0, type: 'ตั้งค่า', code: 'daytimeStart', label: 'เวลาเริ่มต้นประกาศซ้ำ', value: st, status: 'ใช้งาน' });
+    await call('saveSound', { row: de ? de.row : 0, type: 'ตั้งค่า', code: 'daytimeEnd', label: 'เวลาสิ้นสุดประกาศซ้ำ', value: en, status: 'ใช้งาน' });
+    toast('บันทึกการตั้งค่าประกาศซ้ำแล้ว'); await sndReload();
   });
 });
-/* ----- แก้ไขตารางเวลา ----- */
+/* ----- แก้ไขตารางเวลา (เพิ่มได้หลายเวลาต่อเสียง) ----- */
+function sndRenderSchChips() {
+  SND.schTimes.sort();
+  var chips = $('#schTimeChips'), cnt = $('#schTimeCount');
+  if (cnt) cnt.textContent = SND.schTimes.length ? 'เลือกแล้ว ' + SND.schTimes.length + ' เวลา' : 'ยังไม่ได้เพิ่มเวลา';
+  if (!chips) return;
+  chips.innerHTML = SND.schTimes.map(function (t) {
+    return '<span class="sch-chip">' + esc(t) + ' น. <button type="button" data-rm-time="' + esc(t) + '" aria-label="ลบเวลา ' + esc(t) + '">×</button></span>';
+  }).join('') || '<span class="muted">เลือกเวลาด้านบนแล้วกด "+ เพิ่มเวลานี้" (เพิ่มได้หลายเวลา)</span>';
+}
+function sndPushSchTime(val) {
+  var t = String(val || '').trim();
+  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(t)) return false;
+  if (SND.schTimes.indexOf(t) < 0) SND.schTimes.push(t);
+  sndRenderSchChips();
+  return true;
+}
+$('#schTimeAddBtn').addEventListener('click', function () {
+  if (!sndPushSchTime($('#schTimeAdd').value)) { toast('กรุณาเลือกเวลาก่อนกดเพิ่ม', true); $('#schTimeAdd').focus(); return; }
+  $('#schTimeAdd').value = ''; $('#schTimeAdd').focus();
+});
+$('#schTimeAdd').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); $('#schTimeAddBtn').click(); }
+});
+$('#schTimeChips').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-rm-time]'); if (!b) return;
+  SND.schTimes = SND.schTimes.filter(function (t) { return t !== b.dataset.rmTime; });
+  sndRenderSchChips();
+});
 function sndOpenSch(x) {
   SND.editSch = x || null;
-  $('#schTitle').textContent = x ? 'แก้ไขเวลาประกาศ ' + x.code : 'เพิ่มเวลาประกาศ';
+  SND.schTimes = [];
+  $('#schTitle').textContent = x ? 'แก้ไขเวลาประกาศ ' + x.code : 'เพิ่มประกาศตามเวลา';
   var sel = '<optgroup label="เสียงตามเวลา">' + sndTypeOpts('เสียงตามเวลา') + '</optgroup><optgroup label="ปุ่มประกาศ">' + sndTypeOpts('ปุ่ม') + '</optgroup>';
   if (x && !sndSoundByKey(x.value)) sel = '<option value="' + esc(x.value) + '">' + esc(x.value) + ' (ไม่พบเสียง)</option>' + sel;
   $('#schKey').innerHTML = sel;
-  $('#schTime').value = x ? x.code : ''; $('#schKey').value = x ? x.value : $('#schKey').options[0] ? $('#schKey').options[0].value : '';
+  $('#schTime').value = x ? x.code : ''; $('#schTimeAdd').value = '';
+  $('#schKey').value = x ? x.value : $('#schKey').options[0] ? $('#schKey').options[0].value : '';
   $('#schStatus').value = x && !x.on ? 'ปิด' : 'ใช้งาน';
+  $('#schSingleWrap').classList.toggle('hidden', !x);
+  $('#schMultiWrap').classList.toggle('hidden', !!x);
+  if (!x) sndRenderSchChips();
   $('#schModal').classList.remove('hidden');
 }
 $('#sAddSch').addEventListener('click', function () { sndOpenSch(null); });
 $('#schCancel').addEventListener('click', function () { $('#schModal').classList.add('hidden'); });
 $('#schSave').addEventListener('click', function () {
-  var key = $('#schKey').value, e0 = SND.editSch;
+  var key = $('#schKey').value, e0 = SND.editSch, st = $('#schStatus').value;
+  if (!key) { toast('กรุณาเลือกเสียงที่จะประกาศ', true); return; }
+  if (e0) {
+    busy(this, async function () {
+      await call('saveSound', { row: e0.row, type: 'เวลา', code: $('#schTime').value, label: 'เล่นเสียงรหัส ' + key, value: key, status: st });
+      $('#schModal').classList.add('hidden'); toast('บันทึกแล้ว');
+      await sndReload();
+    });
+    return;
+  }
+  var pending = $('#schTimeAdd').value.trim();
+  if (pending) { sndPushSchTime(pending); $('#schTimeAdd').value = ''; }
+  if (!SND.schTimes.length) { toast('กรุณาเลือกเวลาที่จะประกาศอย่างน้อย 1 เวลา', true); $('#schTimeAdd').focus(); return; }
+  var existing = SND.all.filter(function (x) { return x.type === 'เวลา'; }).map(function (x) { return x.code; });
+  var dups = SND.schTimes.filter(function (t) { return existing.indexOf(t) >= 0; });
+  if (dups.length) { toast('เวลานี้มีในตารางแล้ว: ' + dups.join(', ') + ' (กรุณาลบออกหรือแก้ไขรายการเดิม)', true); return; }
+  var times = SND.schTimes.slice();
   busy(this, async function () {
-    await call('saveSound', { row: e0 ? e0.row : 0, type: 'เวลา', code: $('#schTime').value, label: 'เล่นเสียงรหัส ' + key, value: key, status: $('#schStatus').value });
-    $('#schModal').classList.add('hidden'); toast('บันทึกแล้ว');
+    for (var i = 0; i < times.length; i++) {
+      await call('saveSound', { row: 0, type: 'เวลา', code: times[i], label: 'เล่นเสียงรหัส ' + key, value: key, status: st });
+    }
+    $('#schModal').classList.add('hidden');
+    toast('เพิ่มประกาศแล้ว ' + times.length + ' เวลา');
     await sndReload();
   });
 });

@@ -56,7 +56,7 @@ main{display:grid;gap:14px;min-width:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .grid .wide{grid-column:span 2}
 label{display:grid;gap:3px;font-size:13px;color:var(--steel);font-weight:500}
-input[type=text],input[type=search],input[type=password],select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff;color:var(--ink)}
+input[type=text],input[type=search],input[type=password],input[type=time],input[type=number],select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff;color:var(--ink)}
 .addbar{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 /* ---------- ตารางข้อมูล ---------- */
 .tablewrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:8px;background:#fff}
@@ -194,7 +194,7 @@ aside,.card,.mcard,.logincard,.bitem{border-radius:var(--r);border-color:transpa
 .btn.ghost,.btn.danger{box-shadow:none}
 .btn.small{min-height:32px;padding:5px 13px}
 .top .btn.ghost,.phead .btn.ghost{border-color:rgba(255,255,255,.6);color:#fff;background:rgba(255,255,255,.12)}
-input[type=text],input[type=search],input[type=password],select{border-radius:12px;padding:10px 12px;border:1.5px solid var(--line);background:#fbf9ff}
+input[type=text],input[type=search],input[type=password],input[type=time],input[type=number],select{border-radius:12px;padding:10px 12px;border:1.5px solid var(--line);background:#fbf9ff}
 input:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(153,102,255,.2)}
 :focus-visible{outline-color:var(--accent)}
 .tabs{border-bottom:0;background:#fff;padding:5px;border-radius:999px;box-shadow:var(--shadow);width:fit-content;max-width:100%;overflow-x:auto}
@@ -385,3 +385,9 @@ td.act{white-space:nowrap;min-width:170px}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important}
 .skip-link{position:fixed;left:12px;top:-80px;z-index:2000;background:#2a1f47;color:#fff;padding:10px 18px;border-radius:8px;font-weight:700;text-decoration:none;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.35)}
 .skip-link:focus,.skip-link:focus-visible{top:12px;outline:3px solid #5b2fc7;outline-offset:2px}
+
+/* ---------- ชิปเวลาประกาศหลายช่วง ---------- */
+.sch-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:28px}
+.sch-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:13.5px;font-weight:600;border:1px solid var(--line)}
+.sch-chip button{border:0;background:transparent;color:var(--accent-text);font-weight:700;padding:0 2px;line-height:1;font-size:15px}
+.sch-chip button:hover{color:var(--bad)}

@@ -326,6 +326,10 @@ function triggerStaffCall(payload) {
 }
 
 /* ---------- ตารางเวลาในตัวเครื่อง (อ่านจากชีต Sound) ---------- */
+function parseHHMM(s, defMin) {
+  var m = /^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(String(s || ''));
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : defMin;
+}
 function checkInternalSchedule() {
   if (!CFGD) return;
   var now = new Date(), h = now.getHours(), m = now.getMinutes(), cur = pad(h) + ':' + pad(m);
@@ -334,13 +338,19 @@ function checkInternalSchedule() {
   CFGD.schedule.forEach(function (s) { if (s.time === cur) { key = s.key; found = true; } });
   if (!found && CFGD.daytime && CFGD.daytime.on) {
     var tm = h * 60 + m;
-    if (tm >= 540 && tm <= 1140 && m % CFGD.daytime.interval === 0) key = String(CFGD.daytime.key || '3');
+    var startMin = parseHHMM(CFGD.daytime.start, 540);
+    var endMin = parseHHMM(CFGD.daytime.end, 1140);
+    var interval = Math.max(1, parseInt(CFGD.daytime.interval, 10) || 30);
+    var inRange = startMin <= endMin ? (tm >= startMin && tm <= endMin) : (tm >= startMin || tm <= endMin);
+    var elapsed = tm >= startMin ? (tm - startMin) : (1440 - startMin + tm);
+    if (inRange && elapsed % interval === 0) key = String(CFGD.daytime.key || '3');
   }
   if (!key) return;
   lastPlayedTimeStr = cur;
   var it = findItem(key);
   if (!it) return;
-  try { google.script.run.withFailureHandler(function () {}).soundScheduleLog(cur, key, found ? 'ตามตารางเวลา' : 'ประกาศซ้ำช่วงกลางวัน', isPlayingBusy); } catch (e) {}
+  var logKind = found ? 'ตามตารางเวลา' : 'ประกาศซ้ำ (' + (CFGD.daytime && CFGD.daytime.start || '09:00') + '–' + (CFGD.daytime && CFGD.daytime.end || '19:00') + ')';
+  try { google.script.run.withFailureHandler(function () {}).soundScheduleLog(cur, key, logKind, isPlayingBusy); } catch (e) {}
   triggerAnnouncement(it.id, true, it.label, 1, 0);
 }
 setInterval(checkInternalSchedule, 1000);
