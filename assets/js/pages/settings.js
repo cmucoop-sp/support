@@ -660,7 +660,7 @@ $('#bCopyEmbed').addEventListener('click', function () { copyField('#bEmbed', '�
 
 
 /* ============================ ตั้งค่าเสียงประกาศ (Admin) ============================ */
-var SND = { client: null, all: [], edit: null, editSch: null, editRep: null, schTimes: [] };
+var SND = { client: null, all: [], edit: null, editSch: null, editRep: null, schTimes: [], schDates: [], repDates: [] };
 var MU = { avol: 100, avDrag: false, MQ: 'cmucoop/audio/control/music_v1' };
 var SND_TYPES = ['ปุ่ม', 'เสียงตามเวลา', 'ระบบ', 'พนักงาน', 'สถานที่', 'แคชเชียร์', 'ประเภทงดรับ', 'เวลา', 'ตั้งค่า'];
 var SND_HINT = {
@@ -721,10 +721,10 @@ function sndRenderAdmin() {
   }, 5, 'ยังไม่มีปุ่ม');
   var sch = by('เวลา').sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
   sndFill('#sBodySch', sch, function (x) {
-    var s = sndSoundByKey(x.value);
-    return '<tr><td><b>' + esc(x.code) + ' น.</b></td><td><b>' + esc(x.value) + '</b>' + (s ? ' · ' + esc(s.label) : ' <span class="tag">ไม่พบเสียงรหัสนี้</span>') +
+    var sv = sndParseSch(x.value), s = sndSoundByKey(sv.key);
+    return '<tr><td><b>' + esc(x.code) + ' น.</b></td><td>' + sndDateSummaryHtml(sv) + '</td><td><b>' + esc(sv.key) + '</b>' + (s ? ' · ' + esc(s.label) : ' <span class="tag">ไม่พบเสียงรหัสนี้</span>') +
       '</td><td>' + (s ? sndFile(s) : '-') + '</td>' + sndSt(x) + sndActs(x) + '</tr>';
-  }, 5, 'ยังไม่มีเวลาที่ตั้งไว้');
+  }, 6, 'ยังไม่มีเวลาที่ตั้งไว้');
   sndFill('#sBodyTimed', by('เสียงตามเวลา'), function (x) {
     return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + esc(x.label) + '</td><td>' + sndFile(x) + '</td>' + sndSt(x) + sndActs(x) + '</tr>';
   }, 5, 'ยังไม่มีไฟล์เสียง');
@@ -735,12 +735,12 @@ function sndRenderAdmin() {
   var reps = sndRepeatRows();
   sndFill('#sBodyRep', reps, function (r) {
     var s = sndSoundByKey(r.key);
-    return '<tr><td><b>' + esc(r.start) + '–' + esc(r.end) + ' น.</b></td><td>ทุก ' + esc(r.interval) + ' นาที</td><td><b>' + esc(r.key) + '</b>' +
+    return '<tr><td><b>' + esc(r.start) + '–' + esc(r.end) + ' น.</b></td><td>ทุก ' + esc(r.interval) + ' นาที</td><td>' + sndDateSummaryHtml(r) + '</td><td><b>' + esc(r.key) + '</b>' +
       (s ? ' · ' + esc(s.label) : ' <span class="tag">ไม่พบเสียงรหัสนี้</span>') +
       '</td><td>' + (s ? sndFile(s) : '-') + '</td><td>' + (r.on ? 'ใช้งาน' : 'ปิด') + '</td>' +
       '<td class="act"><div class="actw"><button class="btn ghost small" data-a="editRep" data-id="' + esc(r.id) + '">แก้ไข</button>' +
       '<button class="btn danger small" data-a="delRep" data-id="' + esc(r.id) + '">ลบ</button></div></td></tr>';
-  }, 6, 'ยังไม่มีรายการประกาศซ้ำ');
+  }, 7, 'ยังไม่มีรายการประกาศซ้ำ');
 }
 function sndCfgPanel(p) {
   document.querySelectorAll('#cfgNav button').forEach(function (b) { b.classList.toggle('on', b.dataset.cp === p); });
@@ -749,26 +749,140 @@ function sndCfgPanel(p) {
 $('#cfgNav').addEventListener('click', function (e) { var b = e.target.closest('button[data-cp]'); if (b) sndCfgPanel(b.dataset.cp); });
 
 async function sndReload() { await sndLoadAdmin(); }
+function sndFmtThaiDate(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? m[3] + '/' + m[2] + '/' + (parseInt(m[1], 10) + 543) : String(iso || '');
+}
+function sndNormDateRule(o) {
+  var iso = /^\d{4}-\d{2}-\d{2}$/;
+  var dm = o && (o.dateMode === 'dates' || o.dateMode === 'range') ? o.dateMode : 'forever';
+  if (dm === 'dates') {
+    var seen = {}, list = [];
+    (Array.isArray(o.dates) ? o.dates : []).forEach(function (d) {
+      d = String(d || '').trim();
+      if (iso.test(d) && !seen[d]) { seen[d] = 1; list.push(d); }
+    });
+    list.sort();
+    return { dateMode: 'dates', dates: list };
+  }
+  if (dm === 'range') {
+    var f = iso.test(String(o.dateFrom || '')) ? String(o.dateFrom) : '';
+    var t = iso.test(String(o.dateTo || '')) ? String(o.dateTo) : '';
+    return { dateMode: 'range', dateFrom: f, dateTo: t };
+  }
+  return { dateMode: 'forever' };
+}
+function sndParseSch(val) {
+  var raw = String(val || '').trim();
+  if (raw.charAt(0) === '{') {
+    try {
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object' && o.key) return Object.assign({ key: String(o.key) }, sndNormDateRule(o));
+    } catch (_) {}
+  }
+  return { key: raw, dateMode: 'forever' };
+}
+function sndDateSummaryHtml(r) {
+  var dr = sndNormDateRule(r);
+  if (dr.dateMode === 'dates') {
+    if (!dr.dates.length) return '<span class="muted">ไม่ระบุวันที่</span>';
+    var full = dr.dates.map(sndFmtThaiDate).join(', ');
+    var shown = dr.dates.length <= 2 ? full : dr.dates.slice(0, 2).map(sndFmtThaiDate).join(', ') + ' (+' + (dr.dates.length - 2) + ' วัน)';
+    return '<span title="' + esc(full) + '">' + esc(shown) + '</span>';
+  }
+  if (dr.dateMode === 'range') {
+    var a = dr.dateFrom ? sndFmtThaiDate(dr.dateFrom) : 'เริ่มต้น', b = dr.dateTo ? sndFmtThaiDate(dr.dateTo) : 'ไม่มีกำหนด';
+    return '<span>' + esc(a + ' – ' + b) + '</span>';
+  }
+  return '<span class="muted">ตลอดไป</span>';
+}
+function sndDateUi(prefix) {
+  var mode = $('#' + prefix + 'DateMode').value;
+  $('#' + prefix + 'DatesWrap').classList.toggle('hidden', mode !== 'dates');
+  $('#' + prefix + 'RangeWrap').classList.toggle('hidden', mode !== 'range');
+}
+function sndRenderDateChips(prefix) {
+  var arr = SND[prefix + 'Dates']; arr.sort();
+  var cnt = $('#' + prefix + 'DateCount'), chips = $('#' + prefix + 'DateChips');
+  if (cnt) cnt.textContent = arr.length ? 'เลือกแล้ว ' + arr.length + ' วัน' : 'ยังไม่ได้เพิ่มวันที่';
+  if (!chips) return;
+  chips.innerHTML = arr.map(function (d) {
+    return '<span class="sch-chip">' + esc(sndFmtThaiDate(d)) + ' <button type="button" data-rm-date="' + esc(d) + '" aria-label="ลบวันที่">×</button></span>';
+  }).join('') || '<span class="muted">เลือกวันที่ด้านบนแล้วกด "+ เพิ่มวันที่" (เพิ่มได้หลายวัน)</span>';
+}
+function sndPushDate(prefix, val) {
+  var d = String(val || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  var arr = SND[prefix + 'Dates'];
+  if (arr.indexOf(d) < 0) arr.push(d);
+  sndRenderDateChips(prefix);
+  return true;
+}
+function sndBindDateControls(prefix) {
+  $('#' + prefix + 'DateMode').addEventListener('change', function () { sndDateUi(prefix); });
+  $('#' + prefix + 'DateAddBtn').addEventListener('click', function () {
+    if (!sndPushDate(prefix, $('#' + prefix + 'DateAdd').value)) { toast('กรุณาเลือกวันที่ก่อนกดเพิ่ม', true); $('#' + prefix + 'DateAdd').focus(); return; }
+    $('#' + prefix + 'DateAdd').value = '';
+  });
+  $('#' + prefix + 'DateAdd').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); $('#' + prefix + 'DateAddBtn').click(); }
+  });
+  $('#' + prefix + 'DateChips').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-rm-date]'); if (!b) return;
+    SND[prefix + 'Dates'] = SND[prefix + 'Dates'].filter(function (d) { return d !== b.dataset.rmDate; });
+    sndRenderDateChips(prefix);
+  });
+}
+function sndFillDateControls(prefix, rule) {
+  var dr = sndNormDateRule(rule);
+  $('#' + prefix + 'DateMode').value = dr.dateMode;
+  SND[prefix + 'Dates'] = dr.dateMode === 'dates' ? dr.dates.slice() : [];
+  $('#' + prefix + 'DateAdd').value = '';
+  $('#' + prefix + 'DateFrom').value = dr.dateMode === 'range' ? (dr.dateFrom || '') : '';
+  $('#' + prefix + 'DateTo').value = dr.dateMode === 'range' ? (dr.dateTo || '') : '';
+  sndDateUi(prefix);
+  sndRenderDateChips(prefix);
+}
+function sndReadDateControls(prefix) {
+  var mode = $('#' + prefix + 'DateMode').value;
+  if (mode === 'dates') {
+    var pending = $('#' + prefix + 'DateAdd').value.trim();
+    if (pending) { sndPushDate(prefix, pending); $('#' + prefix + 'DateAdd').value = ''; }
+    if (!SND[prefix + 'Dates'].length) { toast('กรุณาเลือกวันที่ประกาศอย่างน้อย 1 วัน', true); $('#' + prefix + 'DateAdd').focus(); return null; }
+    return { dateMode: 'dates', dates: SND[prefix + 'Dates'].slice() };
+  }
+  if (mode === 'range') {
+    var f = $('#' + prefix + 'DateFrom').value.trim(), t = $('#' + prefix + 'DateTo').value.trim();
+    if (!f && !t) { toast('กรุณาระบุวันเริ่มต้นหรือวันสิ้นสุด', true); $('#' + prefix + 'DateFrom').focus(); return null; }
+    if (f && t && f > t) { toast('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', true); $('#' + prefix + 'DateFrom').focus(); return null; }
+    return { dateMode: 'range', dateFrom: f, dateTo: t };
+  }
+  return { dateMode: 'forever' };
+}
+sndBindDateControls('sch');
+sndBindDateControls('rep');
 function sndRepeatRows() {
   var A = SND.all, hhmm = /^([01][0-9]|2[0-3]):[0-5][0-9]$/, out = [];
   var findCfg = function (code) { return A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === code; })[0]; };
   var d = findCfg('daytime');
   if (d) {
-    var dk = findCfg('daytimeKey'), ds = findCfg('daytimeStart'), de = findCfg('daytimeEnd');
-    out.push({
+    var dk = findCfg('daytimeKey'), ds = findCfg('daytimeStart'), de = findCfg('daytimeEnd'), dd = findCfg('daytimeDate');
+    var dr = { dateMode: 'forever' };
+    if (dd && dd.value) { try { dr = sndNormDateRule(JSON.parse(dd.value)); } catch (_) {} }
+    out.push(Object.assign({
       id: 'daytime', legacy: true, row: d.row, code: 'daytime',
       key: dk && dk.value ? dk.value : '3',
       start: ds && hhmm.test(ds.value) ? ds.value : '09:00',
       end: de && hhmm.test(de.value) ? de.value : '19:00',
       interval: Math.max(1, parseInt(d.value, 10) || 30),
       on: !!d.on
-    });
+    }, dr));
   }
   A.filter(function (x) { return x.type === 'ตั้งค่า' && x.code.indexOf('repeat_') === 0; }).forEach(function (x) {
     try {
       var v = JSON.parse(x.value || '{}');
       if (v && v.key && hhmm.test(v.start || '') && hhmm.test(v.end || '')) {
-        out.push({ id: x.code, legacy: false, row: x.row, code: x.code, key: String(v.key), start: v.start, end: v.end, interval: Math.max(1, parseInt(v.interval, 10) || 30), on: !!x.on });
+        out.push(Object.assign({ id: x.code, legacy: false, row: x.row, code: x.code, key: String(v.key), start: v.start, end: v.end, interval: Math.max(1, parseInt(v.interval, 10) || 30), on: !!x.on }, sndNormDateRule(v)));
       }
     } catch (_) {}
   });
@@ -784,6 +898,7 @@ function sndOpenRep(r) {
   $('#repEnd').value = r ? r.end : '19:00';
   $('#repInt').value = r ? String(r.interval) : '30';
   $('#repStatus').value = r && !r.on ? 'ปิด' : 'ใช้งาน';
+  sndFillDateControls('rep', r || { dateMode: 'forever' });
   $('#repModal').classList.remove('hidden');
 }
 $('#sAddRep').addEventListener('click', function () { sndOpenRep(null); });
@@ -794,18 +909,20 @@ $('#repSave').addEventListener('click', function () {
   if (!key) { toast('กรุณาเลือกเสียงที่จะเล่น', true); return; }
   if (!hhmm.test(st) || !hhmm.test(en)) { toast('กรุณาเลือกเวลาเริ่มต้นและเวลาสิ้นสุดให้ถูกต้อง', true); return; }
   if (!(iv >= 1 && iv <= 720)) { toast('ช่วงนาทีต้องอยู่ระหว่าง 1–720 นาที', true); return; }
+  var dr = sndReadDateControls('rep'); if (!dr) return;
   var e0 = SND.editRep;
   busy(this, async function () {
     if (e0 && e0.legacy) {
       var findCfg = function (code) { return SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && x.code === code; })[0]; };
-      var d = findCfg('daytime'), dk = findCfg('daytimeKey'), ds = findCfg('daytimeStart'), de = findCfg('daytimeEnd');
+      var d = findCfg('daytime'), dk = findCfg('daytimeKey'), ds = findCfg('daytimeStart'), de = findCfg('daytimeEnd'), dd = findCfg('daytimeDate');
       await call('saveSound', { row: d ? d.row : 0, type: 'ตั้งค่า', code: 'daytime', label: 'ประกาศซ้ำช่วง ' + st + '–' + en + ' (ทุก ' + iv + ' นาที)', value: String(iv), status: status });
       await call('saveSound', { row: dk ? dk.row : 0, type: 'ตั้งค่า', code: 'daytimeKey', label: 'เสียงที่เล่นในช่วงประกาศซ้ำ (ค่าเพิ่มเติม = รหัสเสียง)', value: key, status: 'ใช้งาน' });
       await call('saveSound', { row: ds ? ds.row : 0, type: 'ตั้งค่า', code: 'daytimeStart', label: 'เวลาเริ่มต้นประกาศซ้ำ', value: st, status: 'ใช้งาน' });
       await call('saveSound', { row: de ? de.row : 0, type: 'ตั้งค่า', code: 'daytimeEnd', label: 'เวลาสิ้นสุดประกาศซ้ำ', value: en, status: 'ใช้งาน' });
+      await call('saveSound', { row: dd ? dd.row : 0, type: 'ตั้งค่า', code: 'daytimeDate', label: 'วันที่ประกาศซ้ำ', value: JSON.stringify(dr), status: 'ใช้งาน' });
     } else {
       var code = e0 ? e0.code : ('repeat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
-      var val = JSON.stringify({ key: key, start: st, end: en, interval: iv });
+      var val = JSON.stringify(Object.assign({ key: key, start: st, end: en, interval: iv }, dr));
       await call('saveSound', { row: e0 ? e0.row : 0, type: 'ตั้งค่า', code: code, label: 'ประกาศซ้ำ ' + st + '–' + en + ' (ทุก ' + iv + ' นาที)', value: val, status: status });
     }
     $('#repModal').classList.add('hidden');
@@ -845,15 +962,17 @@ $('#schTimeChips').addEventListener('click', function (e) {
 function sndOpenSch(x) {
   SND.editSch = x || null;
   SND.schTimes = [];
+  var sv = x ? sndParseSch(x.value) : { key: '', dateMode: 'forever' };
   $('#schTitle').textContent = x ? 'แก้ไขเวลาประกาศ ' + x.code : 'เพิ่มประกาศตามเวลา';
   var sel = '<optgroup label="เสียงตามเวลา">' + sndTypeOpts('เสียงตามเวลา') + '</optgroup><optgroup label="ปุ่มประกาศ">' + sndTypeOpts('ปุ่ม') + '</optgroup>';
-  if (x && !sndSoundByKey(x.value)) sel = '<option value="' + esc(x.value) + '">' + esc(x.value) + ' (ไม่พบเสียง)</option>' + sel;
+  if (x && !sndSoundByKey(sv.key)) sel = '<option value="' + esc(sv.key) + '">' + esc(sv.key) + ' (ไม่พบเสียง)</option>' + sel;
   $('#schKey').innerHTML = sel;
   $('#schTime').value = x ? x.code : ''; $('#schTimeAdd').value = '';
-  $('#schKey').value = x ? x.value : $('#schKey').options[0] ? $('#schKey').options[0].value : '';
+  $('#schKey').value = x ? sv.key : ($('#schKey').options[0] ? $('#schKey').options[0].value : '');
   $('#schStatus').value = x && !x.on ? 'ปิด' : 'ใช้งาน';
   $('#schSingleWrap').classList.toggle('hidden', !x);
   $('#schMultiWrap').classList.toggle('hidden', !!x);
+  sndFillDateControls('sch', sv);
   if (!x) sndRenderSchChips();
   $('#schModal').classList.remove('hidden');
 }
@@ -862,9 +981,11 @@ $('#schCancel').addEventListener('click', function () { $('#schModal').classList
 $('#schSave').addEventListener('click', function () {
   var key = $('#schKey').value, e0 = SND.editSch, st = $('#schStatus').value;
   if (!key) { toast('กรุณาเลือกเสียงที่จะประกาศ', true); return; }
+  var dr = sndReadDateControls('sch'); if (!dr) return;
+  var storedVal = dr.dateMode === 'forever' ? key : JSON.stringify(Object.assign({ key: key }, dr));
   if (e0) {
     busy(this, async function () {
-      await call('saveSound', { row: e0.row, type: 'เวลา', code: $('#schTime').value, label: 'เล่นเสียงรหัส ' + key, value: key, status: st });
+      await call('saveSound', { row: e0.row, type: 'เวลา', code: $('#schTime').value, label: 'เล่นเสียงรหัส ' + key, value: storedVal, status: st });
       $('#schModal').classList.add('hidden'); toast('บันทึกแล้ว');
       await sndReload();
     });
@@ -879,7 +1000,7 @@ $('#schSave').addEventListener('click', function () {
   var times = SND.schTimes.slice();
   busy(this, async function () {
     for (var i = 0; i < times.length; i++) {
-      await call('saveSound', { row: 0, type: 'เวลา', code: times[i], label: 'เล่นเสียงรหัส ' + key, value: key, status: st });
+      await call('saveSound', { row: 0, type: 'เวลา', code: times[i], label: 'เล่นเสียงรหัส ' + key, value: storedVal, status: st });
     }
     $('#schModal').classList.add('hidden');
     toast('เพิ่มประกาศแล้ว ' + times.length + ' เวลา');
@@ -910,7 +1031,7 @@ $('#st-sound').addEventListener('click', async function (e) {
     try {
       await call('deleteSound', rd.row, rd.code);
       if (rd.legacy) {
-        var extra = SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && (x.code === 'daytimeKey' || x.code === 'daytimeStart' || x.code === 'daytimeEnd'); });
+        var extra = SND.all.filter(function (x) { return x.type === 'ตั้งค่า' && (x.code === 'daytimeKey' || x.code === 'daytimeStart' || x.code === 'daytimeEnd' || x.code === 'daytimeDate'); });
         for (var j = 0; j < extra.length; j++) { try { await call('deleteSound', extra[j].row, extra[j].code); } catch (_) {} }
       }
       toast('ลบรายการประกาศซ้ำแล้ว'); await sndReload();

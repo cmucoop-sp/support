@@ -14,7 +14,7 @@
 <base target="_top"/>
 <link href="assets/css/shared/fonts.css?v=16.2" rel="stylesheet"/>
 <script src="assets/vendor/mqtt.min.js"></script>
-<link rel="stylesheet" href="assets/css/pages/settings.css?v=16.10">
+<link rel="stylesheet" href="assets/css/pages/settings.css?v=16.12">
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/shared/app.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/pages/tv-designer.css?v=16.2" rel="stylesheet"/>
@@ -208,12 +208,12 @@
 <div class="card">
 <div class="cardrow"><h3>ตารางเวลาประกาศอัตโนมัติ</h3><button class="btn small" id="sAddSch">+ เพิ่มประกาศตามเวลา</button></div>
 <div class="muted" style="margin-bottom:8px">ถึงเวลาที่ตั้ง TV จะเล่นเสียงที่เลือกเองอัตโนมัติ · เลือกเสียงและกำหนดหลายเวลาที่จะประกาศได้ในครั้งเดียว หรือแก้ไขแต่ละรายการได้</div>
-<div style="overflow:auto"><table class="logt"><thead><tr><th>เวลา</th><th>เลขเสียงที่ประกาศ</th><th>ไฟล์เสียง</th><th>สถานะ</th><th></th></tr></thead><tbody id="sBodySch"></tbody></table></div>
+<div style="overflow:auto"><table class="logt"><thead><tr><th>เวลา</th><th>วันที่ประกาศ</th><th>เลขเสียงที่ประกาศ</th><th>ไฟล์เสียง</th><th>สถานะ</th><th></th></tr></thead><tbody id="sBodySch"></tbody></table></div>
 </div>
 <div class="card">
 <div class="cardrow"><h3>ประกาศซ้ำอัตโนมัติ</h3><button class="btn small" id="sAddRep">+ เพิ่มประกาศซ้ำ</button></div>
 <div class="muted" style="margin-bottom:8px">เล่นเสียงที่เลือกซ้ำในช่วงเวลาที่กำหนด ตามรอบนาทีที่ตั้งไว้ · เพิ่มและตั้งค่าได้หลายรายการ</div>
-<div style="overflow:auto"><table class="logt"><thead><tr><th>ช่วงเวลา</th><th>รอบเวลา</th><th>เสียงที่จะเล่น</th><th>ไฟล์เสียง</th><th>สถานะ</th><th></th></tr></thead><tbody id="sBodyRep"></tbody></table></div>
+<div style="overflow:auto"><table class="logt"><thead><tr><th>ช่วงเวลา</th><th>รอบเวลา</th><th>วันที่ประกาศ</th><th>เสียงที่จะเล่น</th><th>ไฟล์เสียง</th><th>สถานะ</th><th></th></tr></thead><tbody id="sBodyRep"></tbody></table></div>
 </div>
 </div>
 <div class="card cpanel hidden" id="cp-timed">
@@ -281,6 +281,27 @@
 </div>
 <div class="sch-chips" id="schTimeChips"></div>
 </div>
+<div class="date-rule-box">
+<label>วันที่ประกาศ
+<select id="schDateMode">
+<option value="forever">ตลอดไป (ทุกวัน)</option>
+<option value="dates">เลือกวันที่เฉพาะ (ระบุได้หลายวัน)</option>
+<option value="range">ช่วงวันที่ (ตั้งแต่วันที่ – ถึงวันที่)</option>
+</select>
+</label>
+<div class="hidden" id="schDatesWrap" style="margin-top:8px">
+<div class="row">
+<input id="schDateAdd" type="date" style="width:170px"/>
+<button class="btn ghost small" id="schDateAddBtn" type="button">+ เพิ่มวันที่</button>
+<span class="muted" id="schDateCount"></span>
+</div>
+<div class="sch-chips" id="schDateChips"></div>
+</div>
+<div class="grid hidden" id="schRangeWrap" style="margin-top:8px">
+<label>ตั้งแต่วันที่<input id="schDateFrom" type="date"/></label>
+<label>ถึงวันที่<input id="schDateTo" type="date"/></label>
+</div>
+</div>
 <div class="addbar"><button class="btn" id="schSave">บันทึก</button><button class="btn ghost" id="schCancel">ยกเลิก</button></div>
 </div>
 </div>
@@ -293,6 +314,27 @@
 <label>ถึงเวลา<input id="repEnd" type="time" value="19:00"/></label>
 <label>ทุกกี่นาที<input autocomplete="off" id="repInt" inputmode="numeric" min="1" max="720" type="number" value="30"/></label>
 <label>สถานะ<select id="repStatus"><option value="ใช้งาน">เปิดใช้งาน</option><option value="ปิด">ปิด (ไม่เล่น)</option></select></label>
+</div>
+<div class="date-rule-box">
+<label>วันที่ประกาศ
+<select id="repDateMode">
+<option value="forever">ตลอดไป (ทุกวัน)</option>
+<option value="dates">เลือกวันที่เฉพาะ (ระบุได้หลายวัน)</option>
+<option value="range">ช่วงวันที่ (ตั้งแต่วันที่ – ถึงวันที่)</option>
+</select>
+</label>
+<div class="hidden" id="repDatesWrap" style="margin-top:8px">
+<div class="row">
+<input id="repDateAdd" type="date" style="width:170px"/>
+<button class="btn ghost small" id="repDateAddBtn" type="button">+ เพิ่มวันที่</button>
+<span class="muted" id="repDateCount"></span>
+</div>
+<div class="sch-chips" id="repDateChips"></div>
+</div>
+<div class="grid hidden" id="repRangeWrap" style="margin-top:8px">
+<label>ตั้งแต่วันที่<input id="repDateFrom" type="date"/></label>
+<label>ถึงวันที่<input id="repDateTo" type="date"/></label>
+</div>
 </div>
 <div class="addbar"><button class="btn" id="repSave">บันทึก</button><button class="btn ghost" id="repCancel">ยกเลิก</button></div>
 </div>
@@ -351,7 +393,7 @@
 </div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/user-link-qr.js?v=16.8"></script>
-<script src="assets/js/pages/settings.js?v=16.11"></script>
+<script src="assets/js/pages/settings.js?v=16.12"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

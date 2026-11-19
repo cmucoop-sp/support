@@ -330,18 +330,32 @@ function parseHHMM(s, defMin) {
   var m = /^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(String(s || ''));
   return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : defMin;
 }
+function todayIso(d) {
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function matchDateRule(rule, iso) {
+  var dm = rule && rule.dateMode || 'forever';
+  if (dm === 'dates') return Array.isArray(rule.dates) && rule.dates.indexOf(iso) >= 0;
+  if (dm === 'range') {
+    var f = rule.dateFrom || '', t = rule.dateTo || '';
+    if (f && iso < f) return false;
+    if (t && iso > t) return false;
+    return !!(f || t);
+  }
+  return true;
+}
 function checkInternalSchedule() {
   if (!CFGD) return;
-  var now = new Date(), h = now.getHours(), m = now.getMinutes(), cur = pad(h) + ':' + pad(m);
+  var now = new Date(), h = now.getHours(), m = now.getMinutes(), cur = pad(h) + ':' + pad(m), curDate = todayIso(now);
   if (cur === lastPlayedTimeStr) return;
   var key = null, found = false, matchedRep = null;
-  CFGD.schedule.forEach(function (s) { if (s.time === cur) { key = s.key; found = true; } });
+  CFGD.schedule.forEach(function (s) { if (s.time === cur && matchDateRule(s, curDate)) { key = s.key; found = true; } });
   if (!found) {
     var list = Array.isArray(CFGD.repeats) ? CFGD.repeats : (CFGD.daytime && CFGD.daytime.on ? [CFGD.daytime] : []);
     var tm = h * 60 + m;
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
-      if (!r || !r.key) continue;
+      if (!r || !r.key || !matchDateRule(r, curDate)) continue;
       var startMin = parseHHMM(r.start, 540);
       var endMin = parseHHMM(r.end, 1140);
       var interval = Math.max(1, parseInt(r.interval, 10) || 30);
