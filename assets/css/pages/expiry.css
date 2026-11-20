@@ -33,3 +33,27 @@
 .badge.closed{background:#e8f6ee;color:#1f7a4c}
 .action.checked{color:#1f7a4c;border-color:#c6e4d3}
 .action.checked:hover{background:#eefaf3}
+
+.intro-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#inspectDialog{width:min(720px,calc(100% - 24px))}
+.inspect-bar{display:grid;grid-template-columns:minmax(180px,1fr) 150px auto;gap:8px;margin:12px 0 14px;align-items:center}
+.inspect-btns{display:flex;gap:8px}
+.inspect-summary{background:#f8f5fc;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.inspect-prod strong{display:block;font-size:15px;color:#2e2541}
+.inspect-prod small{display:block;color:var(--muted);margin-top:2px}
+.inspect-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px}
+.inspect-kpis>div{background:#fff;border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+.inspect-kpis span{display:block;font-size:11px;color:var(--muted)}
+.inspect-kpis strong{font-size:16px;color:#352641}
+.inspect-kpis>div.warn{border-color:#efc8d0;background:#fff6f8}
+.inspect-kpis>div.warn strong{color:#bb4960}
+.inspect-results{display:grid;gap:9px;max-height:48dvh;overflow-y:auto;padding-right:2px}
+.inspect-empty{text-align:center;padding:28px 12px;color:var(--muted);font-size:13px;background:#faf8fc;border:1px dashed var(--border);border-radius:10px}
+.inspect-empty strong{display:block;color:#574467;font-size:15px;margin-bottom:4px}
+.inspect-card{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:#fff;display:grid;gap:5px}
+.inspect-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.inspect-card-name{font-weight:600;font-size:14px}
+.inspect-card-exp{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px}
+.inspect-card-meta{font-size:12px;color:var(--muted)}
+.inspect-card-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+@media(max-width:700px){.inspect-bar{grid-template-columns:1fr}.inspect-btns{width:100%}.inspect-btns .button{flex:1}}

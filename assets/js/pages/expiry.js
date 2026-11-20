@@ -8,14 +8,14 @@
   const date = iso => dateFmt.format(new Date(iso + 'T00:00:00Z'));
   const time = ts => timeFmt.format(new Date(ts));
   const ranges = [
-    ['all', 'รายการที่เปิดแจ้งเตือน', 'ทุกช่วงเวลา'], ['expired', 'หมดอายุแล้ว', 'เลยวันหมดอายุ'],
+    ['all', 'รายการที่รอตรวจสอบ', 'ทุกช่วงเวลา'], ['expired', 'หมดอายุแล้ว', 'เลยวันหมดอายุ'],
     ['week', 'ภายใน 7 วัน', 'รวมวันนี้'], ['month', 'ภายใน 1 เดือน', 'เกิน 7 วัน'],
     ['m3', '1–3 เดือน', 'เกิน 1 ถึง 3 เดือน'], ['m6', '3–6 เดือน', 'เกิน 3 ถึง 6 เดือน'], ['m12', '6 เดือน–ไม่ถึง 1 ปี', 'เกิน 6 เดือน'], ['later', '1 ปีขึ้นไป', 'ตั้งแต่ 1 ปี']
   ];
   const labels = Object.fromEntries(ranges.map(([key, title]) => [key, title]));
   const statusLabels = { active: 'รอตรวจสอบ', acknowledged: 'รอตรวจสอบ', closed: 'ตรวจสอบแล้ว' };
   let token = '', user = null, data = null, bucket = 'all', page = 1, loadSeq = 0, lookupSeq = 0, historySeq = 0, timer, searchTimer, toastTimer, formState = null, saving = false;
-  let formLocked = false, catalog = null, catalogError = '', matches = [], productSelection = null, manualMode = false, lookupTimer;
+  let formLocked = false, catalog = null, catalogError = '', matches = [], productSelection = null, manualMode = false, lookupTimer, cameraMode = 'lot', inspectSeq = 0, inspectRows = [];
   const pad = n => String(n).padStart(2, '0');
   const currentYear = () => new Intl.DateTimeFormat('en-US-u-ca-gregory-nu-latn', { year:'numeric', timeZone:'Asia/Bangkok' }).format(new Date());
   function expiryIso(day, month, year) {
@@ -89,7 +89,7 @@
     $('#workspace').hidden = true; $('#loginPanel').hidden = false; $('#logout').hidden = true; $('#me').textContent = '';
     $('#productResults').innerHTML = ''; $('#branch').innerHTML = '<option value="">เลือกสาขา</option>'; $('#productSearch').value = '';
     $('#rows').innerHTML = ''; $('#stats').innerHTML = ''; $('#historyContent').innerHTML = ''; $('#lotForm').reset(); $('#password').value = '';
-    $('#lotDialog').close(); $('#historyDialog').close(); $('#loginError').textContent = message;
+    $('#lotDialog').close(); $('#inspectDialog').close(); $('#historyDialog').close(); $('#loginError').textContent = message;
   }
   async function startApp() {
     const me = await call('whoami');
@@ -140,7 +140,7 @@
     const selected = $('#branchFilter').value, branches = [...new Set([...data.branches, ...(catalog ? catalog.branches : [])])].sort();
     if (selected && !branches.includes(selected)) branches.push(selected);
     $('#branchFilter').innerHTML = '<option value="">ทุกสาขา</option>' + branches.map(b => '<option value="' + esc(b) + '">' + esc(b) + '</option>').join(''); $('#branchFilter').value = selected;
-    $('#rows').innerHTML = data.rows.length ? data.rows.map(rowHtml).join('') : '<tr><td colspan="7" class="empty"><strong>' + (data.counts.total === 0 && $('#stateFilter').value === 'open' && !$('#search').value ? 'ยังไม่มีรายการที่เปิดแจ้งเตือน' : 'ไม่พบรายการตามตัวกรอง') + '</strong>เพิ่มล็อตใหม่ หรือเปลี่ยนช่วงเวลา สาขา และคำค้นหา</td></tr>';
+    $('#rows').innerHTML = data.rows.length ? data.rows.map(rowHtml).join('') : '<tr><td colspan="7" class="empty"><strong>' + (data.counts.total === 0 && $('#stateFilter').value === 'open' && !$('#search').value ? 'ยังไม่มีรายการที่รอตรวจสอบ' : 'ไม่พบรายการตามตัวกรอง') + '</strong>เพิ่มล็อตใหม่ หรือเปลี่ยนช่วงเวลา สาขา และคำค้นหา</td></tr>';
     const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
     $('#pageInfo').textContent = 'หน้า ' + page + ' / ' + numFmt.format(pages); $('#prev').disabled = page <= 1; $('#next').disabled = page >= pages;
     $('#resultInfo').textContent = numFmt.format(data.total) + ' รายการ · ' + labels[bucket] + ' · ' + ($('#stateFilter').selectedOptions[0].textContent);
@@ -304,16 +304,23 @@
   $('#lookup').addEventListener('click', lookup);
   $('#productSearch').addEventListener('input', () => { resetProduct(); lookupSeq++; clearTimeout(lookupTimer); clearResults(); $('#lookup').disabled = false; lookupTimer = setTimeout(lookup, 450); });
   $('#productSearch').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); lookup().then(() => { if ($('#lotDialog').open && !formLocked && productSelection) $('#expiryDay').focus(); }); } });
-  $('#branch').addEventListener('change', () => { renderLocations(''); resetLocationAdder(); resetProduct(); lookupSeq++; clearResults(); if ($('#productSearch').value.trim()) lookup(); });
+  $('#branch').addEventListener('change', () => { if (formState && !formState.id && formState.groupId) { formState.groupId = 0; $('#formHelp').textContent = 'เปลี่ยนสาขาแล้ว · ระบบจะสร้างเลขล็อตใหม่ของสาขานี้เมื่อบันทึก'; } renderLocations(''); resetLocationAdder(); resetProduct(); lookupSeq++; clearResults(); if ($('#productSearch').value.trim()) lookup(); });
   const scanner = new window.CMUBarcodeScanner($('#cameraVideo'), (message, error = false) => { $('#cameraStatus').textContent = message; $('#cameraStatus').classList.toggle('error', error); }, code => {
-    closeCamera(); if (!$('#lotDialog').open || formLocked || saving) return;
+    closeCamera();
+    if (cameraMode === 'inspect') {
+      if (!$('#inspectDialog').open) return;
+      $('#inspectInput').value = code;
+      runInspect();
+      return;
+    }
+    if (!$('#lotDialog').open || formLocked || saving) return;
     resetProduct(); $('#productSearch').value = code; lookup().then(() => { if ($('#lotDialog').open && productSelection) $('#expiryDay').focus(); });
   });
   scanner.controls = { zoom: $('#cameraZoom'), zoomContainer: $('#zoomControl'), torch: $('#cameraTorch') };
   function closeCamera() { if (typeof scanner !== 'undefined') scanner.stop(); if ($('#cameraDialog').open) $('#cameraDialog').close(); }
-  $('#openCamera').addEventListener('click', () => { if (formLocked || saving || !$('#lotDialog').open) return; $('#cameraDialog').showModal(); scanner.start(); });
+  $('#openCamera').addEventListener('click', () => { if (formLocked || saving || !$('#lotDialog').open) return; cameraMode = 'lot'; $('#cameraDialog').showModal(); scanner.start(); });
   $('#retryCamera').addEventListener('click', () => scanner.start());
-  $('#closeCamera').addEventListener('click', closeCamera); $('#cancelCamera').addEventListener('click', () => { closeCamera(); $('#productSearch').focus(); });
+  $('#closeCamera').addEventListener('click', closeCamera); $('#cancelCamera').addEventListener('click', () => { closeCamera(); (cameraMode === 'inspect' ? $('#inspectInput') : $('#productSearch')).focus(); });
   $('#cameraDialog').addEventListener('close', () => scanner.stop());
   document.addEventListener('visibilitychange', () => { if (document.hidden) closeCamera(); });
   window.addEventListener('pagehide', closeCamera);
@@ -365,6 +372,96 @@
     try { await call('expirySetStatus', row.id, row.version, action); toast(action === 'closed' ? 'ทำเครื่องหมายตรวจสอบแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว'); await load(); }
     catch (e) { toast(e.message, true); await load(true); }
     finally { button.disabled = false; }
+  });
+  function openInspect() {
+    if (!user || !data) return;
+    const branches = [...new Set([...(data.branches || []), ...(catalog ? catalog.branches : [])])].sort();
+    const curBr = $('#branchFilter').value || '';
+    if (curBr && !branches.includes(curBr)) branches.push(curBr);
+    $('#inspectBranch').innerHTML = '<option value="">ทุกสาขา</option>' + branches.map(b => '<option value="' + esc(b) + '">' + esc(b) + '</option>').join('');
+    $('#inspectBranch').value = curBr;
+    $('#inspectInput').value = '';
+    $('#inspectSummary').hidden = true;
+    $('#inspectSummary').innerHTML = '';
+    $('#inspectResults').innerHTML = '<div class="inspect-empty">กด <strong>เปิดกล้องสแกน</strong> หรือพิมพ์บาร์โค้ด / ชื่อสินค้า แล้วกดค้นหา</div>';
+    inspectRows = [];
+    $('#inspectDialog').showModal();
+    $('#inspectInput').focus();
+  }
+  async function runInspect() {
+    const q = $('#inspectInput').value.trim(), br = $('#inspectBranch').value;
+    if (!q) { $('#inspectResults').innerHTML = '<div class="inspect-empty">กรุณาสแกนบาร์โค้ด หรือพิมพ์รหัส / ชื่อสินค้าที่ต้องการตรวจสอบ</div>'; $('#inspectSummary').hidden = true; $('#inspectInput').focus(); return; }
+    const seq = ++inspectSeq;
+    $('#inspectSearchBtn').disabled = true;
+    $('#inspectSummary').hidden = true;
+    $('#inspectResults').innerHTML = '<div class="inspect-empty">กำลังตรวจสอบข้อมูลล็อต…</div>';
+    try {
+      const res = await call('expiryInspect', q, br);
+      if (seq !== inspectSeq || !$('#inspectDialog').open) return;
+      inspectRows = res.rows || [];
+      const s = res.summary || { total: 0, open: 0, closed: 0, expired: 0, week: 0, month: 0 };
+      if (!inspectRows.length) {
+        $('#inspectSummary').hidden = true;
+        $('#inspectResults').innerHTML = '<div class="inspect-empty"><strong>ไม่พบการนำเข้าสินค้ารายการนี้</strong>ยังไม่มีล็อตของ “' + esc(q) + '”' + (br ? ' ในสาขา ' + esc(br) : '') + ' ในระบบแจ้งเตือนวันหมดอายุ</div>';
+        return;
+      }
+      const uniqueNames = [...new Set(inspectRows.map(r => r.name))];
+      const headerTitle = uniqueNames.length === 1 ? uniqueNames[0] : 'พบ ' + uniqueNames.length + ' สินค้าที่ตรงกับ “' + q + '”';
+      const urgentCount = s.expired + s.week;
+      $('#inspectSummary').hidden = false;
+      $('#inspectSummary').innerHTML =
+        '<div class="inspect-prod"><strong>' + esc(headerTitle) + '</strong>' + (uniqueNames.length === 1 && inspectRows[0].barcode ? '<small class="barcode">' + esc(inspectRows[0].barcode) + '</small>' : '') + '</div>' +
+        '<div class="inspect-kpis">' +
+          '<div><span>นำเข้าทั้งหมด</span><strong>' + numFmt.format(s.total) + ' ล็อต</strong></div>' +
+          '<div><span>รอตรวจสอบ</span><strong>' + numFmt.format(s.open) + ' ล็อต</strong></div>' +
+          '<div><span>ตรวจสอบแล้ว</span><strong>' + numFmt.format(s.closed) + ' ล็อต</strong></div>' +
+          (urgentCount ? '<div class="warn"><span>หมดอายุ / ≤ 7 วัน</span><strong>' + numFmt.format(urgentCount) + ' ล็อต</strong></div>' : '') +
+        '</div>';
+      $('#inspectResults').innerHTML = inspectRows.map(r => {
+        const dayText = r.days < 0 ? 'เลยกำหนด ' + numFmt.format(-r.days) + ' วัน' : r.days === 0 ? 'หมดอายุวันนี้' : 'อีก ' + numFmt.format(r.days) + ' วัน';
+        const qtyText = r.quantity === null ? 'ไม่ระบุจำนวน' : numFmt.format(r.quantity) + ' ' + esc(r.unit);
+        const stBadge = '<span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบ') + '</span>';
+        let btns = '<button type="button" class="action" data-iact="history" data-id="' + r.id + '">ประวัติ</button>';
+        if (data.me.edit) {
+          btns += r.status === 'closed'
+            ? '<button type="button" class="action" data-iact="active" data-id="' + r.id + '">เปิดอีกครั้ง</button>'
+            : '<button type="button" class="action checked" data-iact="closed" data-id="' + r.id + '">ตรวจสอบแล้ว</button>';
+        }
+        return '<div class="inspect-card">' +
+          '<div class="inspect-card-top"><span class="lot-number">' + esc(r.lot) + '</span>' + stBadge + '</div>' +
+          (uniqueNames.length > 1 ? '<div class="inspect-card-name">' + esc(r.name) + ' <small class="barcode">' + esc(r.barcode || '') + '</small></div>' : '') +
+          '<div class="inspect-card-exp"><strong>หมดอายุ ' + date(r.expires) + '</strong> <span class="badge ' + r.bucket + '">' + dayText + '</span></div>' +
+          '<div class="inspect-card-meta">' + esc(r.branch) + ' · ' + esc(r.location || 'ไม่ระบุจุดวาง') + ' · ' + qtyText + ' · บันทึก ' + time(r.createdTs) + '</div>' +
+          (r.note ? '<div class="inspect-card-meta">หมายเหตุ: ' + esc(r.note) + '</div>' : '') +
+          '<div class="inspect-card-acts">' + btns + '</div>' +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      if (seq === inspectSeq) $('#inspectResults').innerHTML = '<div class="error">' + esc(e.message) + '</div>';
+    } finally {
+      if (seq === inspectSeq) $('#inspectSearchBtn').disabled = false;
+    }
+  }
+  $('#inspectBtn').addEventListener('click', openInspect);
+  $('#closeInspect').addEventListener('click', () => { closeCamera(); $('#inspectDialog').close(); });
+  $('#cancelInspect').addEventListener('click', () => { closeCamera(); $('#inspectDialog').close(); });
+  $('#inspectSearchBtn').addEventListener('click', runInspect);
+  $('#inspectBranch').addEventListener('change', () => { if ($('#inspectInput').value.trim()) runInspect(); });
+  $('#inspectInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runInspect(); } });
+  $('#inspectScanBtn').addEventListener('click', () => { cameraMode = 'inspect'; $('#cameraDialog').showModal(); scanner.start(); });
+  $('#inspectResults').addEventListener('click', async e => {
+    const b = e.target.closest('[data-iact]'); if (!b) return;
+    const row = inspectRows.find(r => r.id === Number(b.dataset.id)); if (!row) return;
+    const act = b.dataset.iact;
+    if (act === 'history') { await showHistory(row); return; }
+    if (act === 'closed' && !confirm('ยืนยันตรวจสอบแล้ว ' + row.lot + ' (' + row.name + ')?')) return;
+    b.disabled = true;
+    try {
+      await call('expirySetStatus', row.id, row.version, act);
+      toast(act === 'closed' ? 'ทำเครื่องหมายตรวจสอบแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว');
+      await Promise.all([runInspect(), load(true)]);
+    } catch (err) { toast(err.message, true); }
+    finally { b.disabled = false; }
   });
   async function showHistory(row) {
     const seq = ++historySeq;
