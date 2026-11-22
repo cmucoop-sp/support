@@ -8,12 +8,12 @@
   const date = iso => dateFmt.format(new Date(iso + 'T00:00:00Z'));
   const time = ts => timeFmt.format(new Date(ts));
   const ranges = [
-    ['all', 'รายการที่รอตรวจสอบ', 'ทุกช่วงเวลา'], ['expired', 'หมดอายุแล้ว', 'เลยวันหมดอายุ'],
+    ['all', 'รายการที่รอตรวจสอบจุดวาง', 'ทุกช่วงเวลา'], ['expired', 'หมดอายุแล้ว', 'เลยวันหมดอายุ'],
     ['week', 'ภายใน 7 วัน', 'รวมวันนี้'], ['month', 'ภายใน 1 เดือน', 'เกิน 7 วัน'],
     ['m3', '1–3 เดือน', 'เกิน 1 ถึง 3 เดือน'], ['m6', '3–6 เดือน', 'เกิน 3 ถึง 6 เดือน'], ['m12', '6 เดือน–ไม่ถึง 1 ปี', 'เกิน 6 เดือน'], ['later', '1 ปีขึ้นไป', 'ตั้งแต่ 1 ปี']
   ];
   const labels = Object.fromEntries(ranges.map(([key, title]) => [key, title]));
-  const statusLabels = { active: 'รอตรวจสอบ', acknowledged: 'รอตรวจสอบ', closed: 'ตรวจสอบแล้ว' };
+  const statusLabels = { active: 'รอตรวจสอบจุดวาง', acknowledged: 'รอตรวจสอบจุดวาง', closed: 'ตรวจสอบจุดวางแล้ว' };
   let token = '', user = null, data = null, bucket = 'all', page = 1, loadSeq = 0, lookupSeq = 0, historySeq = 0, timer, searchTimer, toastTimer, formState = null, saving = false;
   let formLocked = false, catalog = null, catalogError = '', matches = [], productSelection = null, manualMode = false, lookupTimer, cameraMode = 'lot', inspectSeq = 0, inspectRows = [];
   const pad = n => String(n).padStart(2, '0');
@@ -140,7 +140,7 @@
     const selected = $('#branchFilter').value, branches = [...new Set([...data.branches, ...(catalog ? catalog.branches : [])])].sort();
     if (selected && !branches.includes(selected)) branches.push(selected);
     $('#branchFilter').innerHTML = '<option value="">ทุกสาขา</option>' + branches.map(b => '<option value="' + esc(b) + '">' + esc(b) + '</option>').join(''); $('#branchFilter').value = selected;
-    $('#rows').innerHTML = data.rows.length ? data.rows.map(rowHtml).join('') : '<tr><td colspan="7" class="empty"><strong>' + (data.counts.total === 0 && $('#stateFilter').value === 'open' && !$('#search').value ? 'ยังไม่มีรายการที่รอตรวจสอบ' : 'ไม่พบรายการตามตัวกรอง') + '</strong>เพิ่มล็อตใหม่ หรือเปลี่ยนช่วงเวลา สาขา และคำค้นหา</td></tr>';
+    $('#rows').innerHTML = data.rows.length ? data.rows.map(rowHtml).join('') : '<tr><td colspan="7" class="empty"><strong>' + (data.counts.total === 0 && $('#stateFilter').value === 'open' && !$('#search').value ? 'ยังไม่มีรายการที่รอตรวจสอบจุดวาง' : 'ไม่พบรายการตามตัวกรอง') + '</strong>เพิ่มล็อตใหม่ หรือเปลี่ยนช่วงเวลา สาขา และคำค้นหา</td></tr>';
     const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
     $('#pageInfo').textContent = 'หน้า ' + page + ' / ' + numFmt.format(pages); $('#prev').disabled = page <= 1; $('#next').disabled = page >= pages;
     $('#resultInfo').textContent = numFmt.format(data.total) + ' รายการ · ' + labels[bucket] + ' · ' + ($('#stateFilter').selectedOptions[0].textContent);
@@ -155,14 +155,14 @@
     let actions = action('ประวัติ', 'history');
     if (data.me.edit) {
       actions = action('แก้ไข', 'edit') + actions;
-      actions += r.status === 'closed' ? action('เปิดอีกครั้ง', 'active') : action('ตรวจสอบแล้ว', 'closed', 'checked');
+      actions += r.status === 'closed' ? action('เปิดอีกครั้ง', 'active') : action('ตรวจสอบจุดวางแล้ว', 'closed', 'checked');
       actions += action('ลบรายการ', 'delete', 'delete');
     }
     return '<tr><td data-label="ล็อต"><span class="lot-number">' + esc(r.lot) + '</span><small>' + time(r.createdTs) + '</small><small>' + esc(r.createdBy) + '</small></td>' +
       '<td data-label="สินค้า"><div class="product">' + esc(r.name) + '</div><small class="barcode">' + esc(r.barcode || 'ไม่ได้ระบุบาร์โค้ด') + '</small>' + (r.note ? '<small>' + esc(r.note.slice(0, 70)) + '</small>' : '') + '</td>' +
       '<td data-label="สาขา / จุดวาง">' + esc(r.branch) + '<small>' + esc(r.location || 'ไม่ระบุจุดวาง') + '</small></td>' +
       '<td data-label="วันหมดอายุ">' + date(r.expires) + '<small><span class="badge ' + r.bucket + '">' + dayText + '</span></small></td>' +
-      '<td data-label="จำนวน">' + quantity + '</td><td data-label="สถานะ"><span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบ') + '</span></td>' +
+      '<td data-label="จำนวน">' + quantity + '</td><td data-label="สถานะ"><span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบจุดวาง') + '</span></td>' +
       '<td data-label="จัดการ"><div class="actions">' + actions + '</div></td></tr>';
   }
   function selectBucket(key) { bucket = key; page = 1; $('#stateFilter').value = 'open'; load(); }
@@ -367,9 +367,9 @@
       finally { button.disabled = false; }
       return;
     }
-    if (action === 'closed' && !confirm('ยืนยันตรวจสอบแล้ว ' + row.lot + ' (' + row.name + ')?\nล็อตอื่นยังแจ้งเตือนตามเดิม และล็อตนี้ยังดูประวัติหรือเปิดอีกครั้งได้')) return;
+    if (action === 'closed' && !confirm('ยืนยันตรวจสอบจุดวางแล้ว ' + row.lot + ' (' + row.name + ')?\nล็อตอื่นยังแจ้งเตือนตามเดิม และล็อตนี้ยังดูประวัติหรือเปิดอีกครั้งได้')) return;
     button.disabled = true;
-    try { await call('expirySetStatus', row.id, row.version, action); toast(action === 'closed' ? 'ทำเครื่องหมายตรวจสอบแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว'); await load(); }
+    try { await call('expirySetStatus', row.id, row.version, action); toast(action === 'closed' ? 'ทำเครื่องหมายตรวจสอบจุดวางแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว'); await load(); }
     catch (e) { toast(e.message, true); await load(true); }
     finally { button.disabled = false; }
   });
@@ -413,19 +413,19 @@
         '<div class="inspect-prod"><strong>' + esc(headerTitle) + '</strong>' + (uniqueNames.length === 1 && inspectRows[0].barcode ? '<small class="barcode">' + esc(inspectRows[0].barcode) + '</small>' : '') + '</div>' +
         '<div class="inspect-kpis">' +
           '<div><span>นำเข้าทั้งหมด</span><strong>' + numFmt.format(s.total) + ' ล็อต</strong></div>' +
-          '<div><span>รอตรวจสอบ</span><strong>' + numFmt.format(s.open) + ' ล็อต</strong></div>' +
-          '<div><span>ตรวจสอบแล้ว</span><strong>' + numFmt.format(s.closed) + ' ล็อต</strong></div>' +
+          '<div><span>รอตรวจสอบจุดวาง</span><strong>' + numFmt.format(s.open) + ' ล็อต</strong></div>' +
+          '<div><span>ตรวจสอบจุดวางแล้ว</span><strong>' + numFmt.format(s.closed) + ' ล็อต</strong></div>' +
           (urgentCount ? '<div class="warn"><span>หมดอายุ / ≤ 7 วัน</span><strong>' + numFmt.format(urgentCount) + ' ล็อต</strong></div>' : '') +
         '</div>';
       $('#inspectResults').innerHTML = inspectRows.map(r => {
         const dayText = r.days < 0 ? 'เลยกำหนด ' + numFmt.format(-r.days) + ' วัน' : r.days === 0 ? 'หมดอายุวันนี้' : 'อีก ' + numFmt.format(r.days) + ' วัน';
         const qtyText = r.quantity === null ? 'ไม่ระบุจำนวน' : numFmt.format(r.quantity) + ' ' + esc(r.unit);
-        const stBadge = '<span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบ') + '</span>';
+        const stBadge = '<span class="badge ' + (r.status === 'closed' ? 'closed' : 'active') + '">' + (statusLabels[r.status] || 'รอตรวจสอบจุดวาง') + '</span>';
         let btns = '<button type="button" class="action" data-iact="history" data-id="' + r.id + '">ประวัติ</button>';
         if (data.me.edit) {
           btns += r.status === 'closed'
             ? '<button type="button" class="action" data-iact="active" data-id="' + r.id + '">เปิดอีกครั้ง</button>'
-            : '<button type="button" class="action checked" data-iact="closed" data-id="' + r.id + '">ตรวจสอบแล้ว</button>';
+            : '<button type="button" class="action checked" data-iact="closed" data-id="' + r.id + '">ตรวจสอบจุดวางแล้ว</button>';
         }
         return '<div class="inspect-card">' +
           '<div class="inspect-card-top"><span class="lot-number">' + esc(r.lot) + '</span>' + stBadge + '</div>' +
@@ -454,11 +454,11 @@
     const row = inspectRows.find(r => r.id === Number(b.dataset.id)); if (!row) return;
     const act = b.dataset.iact;
     if (act === 'history') { await showHistory(row); return; }
-    if (act === 'closed' && !confirm('ยืนยันตรวจสอบแล้ว ' + row.lot + ' (' + row.name + ')?')) return;
+    if (act === 'closed' && !confirm('ยืนยันตรวจสอบจุดวางแล้ว ' + row.lot + ' (' + row.name + ')?')) return;
     b.disabled = true;
     try {
       await call('expirySetStatus', row.id, row.version, act);
-      toast(act === 'closed' ? 'ทำเครื่องหมายตรวจสอบแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว');
+      toast(act === 'closed' ? 'ทำเครื่องหมายตรวจสอบจุดวางแล้ว: ' + row.lot : 'เปิดแจ้งเตือนอีกครั้งแล้ว');
       await Promise.all([runInspect(), load(true)]);
     } catch (err) { toast(err.message, true); }
     finally { b.disabled = false; }
