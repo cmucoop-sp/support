@@ -812,13 +812,13 @@ async function pfRender(font, list) {
   await ensureThaiFont();
   $('#pFontSample').style.fontFamily = PDF_FONT;
 }
-async function buildPrintPdf(results) {
+async function buildPrintPdf(results, partners) {
   await ensureThaiFont();
   var W = Math.round(PDF_W * PX), H = Math.round(PDF_H * PX);
   var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   var ctx = cv.getContext('2d');
   if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
-  var layouts = results.map(function (d) { return layoutSection(ctx, d, undefined, true); });
+  var layouts = results.map(function (d) { return layoutSection(ctx, d, partners, true); });
   var total = layouts.reduce(function (s, L) { return s + L.pages.length; }, 0), no = 0, jp = [], at = fmt(nowMs());
   for (var a = 0; a < layouts.length; a++) {
     for (var b = 0; b < layouts[a].pages.length; b++) {
@@ -870,6 +870,246 @@ $('#btnPrintOld').addEventListener('click', async function () {
   });
   btn.textContent = 'ปริ้นจากเบราว์เซอร์ (สำรอง)';
 });
+
+/* ============================ ปริ้นเฉพาะรายการ (กรอกบาร์โค้ด + ช่องกระจาย) ============================ */
+var PQ = { all: null, header: null, sheet: '', loading: null, picked: null, items: [] };
+function pqNormBar(s) { return String(s == null ? '' : s).replace(/[\s'"]+/g, '').replace(/[pP]/g, '').toLowerCase(); }
+async function pqEnsureAll(force) {
+  if (!force && PQ.all) return PQ.all;
+  if (PQ.loading) return PQ.loading;
+  var sheet = (S.cats && S.cats[0] && S.cats[0].sheet) || Object.keys(S.sheets || {})[0] || 'บาร์สินค้า';
+  PQ.loading = call('getCategoryData', sheet, '*').then(function (res) {
+    PQ.sheet = res.sheet || sheet;
+    PQ.header = res.header || { company: 'ร้านสหกรณ์ มหาวิทยาลัยเชียงใหม่ จำกัด', title: 'รายการบาร์เดี่ยว/บาร์แพ็ค', statusText: '' };
+    PQ.all = Array.isArray(res.rows) ? res.rows : [];
+    PQ.loading = null;
+    return PQ.all;
+  }, function (err) {
+    PQ.loading = null;
+    throw err;
+  });
+  return PQ.loading;
+}
+function pqFindMatches(raw) {
+  var q = String(raw || '').trim();
+  if (!q || !PQ.all) return { exact: null, list: [] };
+  var nb = pqNormBar(q), ql = q.toLowerCase();
+  var exact = null, list = [];
+  for (var i = 0; i < PQ.all.length; i++) {
+    var row = PQ.all[i], v = row.v || [];
+    var pb = pqNormBar(v[5]), ub = pqNormBar(v[7]);
+    if (nb && ((pb && pb === nb) || (ub && ub === nb))) {
+      if (!exact) exact = row;
+      list.push(row);
+    }
+  }
+  if (list.length) return { exact: list.length === 1 ? exact : null, list: list.slice(0, 15) };
+  for (var j = 0; j < PQ.all.length; j++) {
+    var r2 = PQ.all[j], v2 = r2.v || [];
+    var hay = (String(v2[3] || '') + ' ' + String(v2[5] || '') + ' ' + String(v2[7] || '') + ' ' + String(v2[1] || '')).toLowerCase();
+    if (hay.indexOf(ql) >= 0) {
+      list.push(r2);
+      if (list.length >= 15) break;
+    }
+  }
+  return { exact: list.length === 1 ? list[0] : null, list: list };
+}
+function pqSetPicked(row) {
+  PQ.picked = row || null;
+  var el = $('#pqPicked');
+  if (!el) return;
+  if (!row) { el.textContent = ''; return; }
+  var v = row.v || [];
+  el.innerHTML = 'พบสินค้า: <b>' + esc(v[3]) + '</b>' +
+    (v[2] ? ' · หมวด ' + esc(v[2]) : '') +
+    (v[4] ? ' · ต่อแพ็ค ' + esc(v[4]) : '') +
+    (v[5] ? ' · แพ็ค ' + esc(v[5]) : '') +
+    (v[7] ? ' · เดี่ยว ' + esc(v[7]) : '');
+}
+function pqRenderMatches(list) {
+  var box = $('#pqMatches');
+  if (!box) return;
+  if (!list || !list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.innerHTML = list.map(function (row, idx) {
+    var v = row.v || [];
+    return '<button type="button" class="pq-match-item" data-idx="' + idx + '">' +
+      '<b>' + esc(v[3]) + '</b>' +
+      '<span>' + esc(v[2] || '-') + (v[1] ? ' · คู่ค้า ' + esc(v[1]) : '') +
+      (v[5] ? ' · แพ็ค ' + esc(v[5]) : '') + (v[7] ? ' · เดี่ยว ' + esc(v[7]) : '') + '</span></button>';
+  }).join('');
+  box._list = list;
+  box.classList.remove('hidden');
+}
+function pqRenderQueue() {
+  var n = PQ.items.length;
+  $('#pqCount').textContent = n ? 'เตรียมปริ้น ' + n + ' รายการ' : 'ยังไม่มีรายการที่เตรียมปริ้น';
+  $('#pqTableWrap').classList.toggle('hidden', !n);
+  $('#pqPrintBtn').disabled = !n;
+  $('#pqExcelBtn').disabled = !n;
+  $('#pqClearBtn').disabled = !n;
+  $('#pqTbody').innerHTML = PQ.items.map(function (it, idx) {
+    var v = it.row.v || [];
+    return '<tr>' +
+      '<td style="text-align:center">' + (idx + 1) + '</td>' +
+      '<td>' + esc(v[2] || '-') + (v[1] ? '<div class="muted" style="font-size:12px">' + esc(v[1]) + '</div>' : '') + '</td>' +
+      '<td><b>' + esc(v[3]) + '</b>' + (v[4] ? '<div class="muted" style="font-size:12px">ต่อแพ็ค: ' + esc(v[4]) + '</div>' : '') + '</td>' +
+      '<td class="bc">' + (v[5] ? 'แพ็ค: ' + esc(v[5]) : '') + (v[5] && v[7] ? '<br>' : '') + (v[7] ? 'เดี่ยว: ' + esc(v[7]) : '') + '</td>' +
+      '<td><input type="text" class="pq-spread-inp" data-pq-idx="' + idx + '" value="' + esc(it.spread) + '" inputmode="decimal" aria-label="จำนวนกระจาย"/></td>' +
+      '<td style="text-align:center"><button type="button" class="btn danger small" data-pq-del="' + idx + '" aria-label="ลบรายการ">ลบ</button></td>' +
+    '</tr>';
+  }).join('');
+}
+function pqAddItem(row, spreadRaw) {
+  if (!row) return;
+  var sp = String(spreadRaw == null ? '' : spreadRaw).trim();
+  var dup = PQ.items.find(function (x) { return x.row.r === row.r; });
+  if (dup) {
+    var n1 = Number(dup.spread), n2 = Number(sp);
+    if (dup.spread !== '' && sp !== '' && isFinite(n1) && isFinite(n2)) {
+      dup.spread = String(Math.round((n1 + n2) * 1000) / 1000);
+      toast('รวมยอดกระจายกับรายการเดิมเป็น ' + dup.spread);
+    } else if (sp !== '') {
+      dup.spread = sp;
+      toast('อัปเดตจำนวนกระจายรายการเดิมแล้ว');
+    } else {
+      toast('รายการนี้อยู่ในคิวปริ้นแล้ว (แก้จำนวนในตารางได้)');
+    }
+  } else {
+    PQ.items.push({ row: row, spread: sp });
+  }
+  PQ.picked = null;
+  $('#pqCode').value = '';
+  $('#pqSpread').value = '';
+  pqSetPicked(null);
+  pqRenderMatches([]);
+  pqRenderQueue();
+  $('#pqCode').focus();
+}
+function pqBuildDataset() {
+  var rows = PQ.items.map(function (it, idx) {
+    var v = (it.row.v || []).slice();
+    v[0] = idx + 1;
+    v[9] = it.spread;
+    return { r: it.row.r, v: v };
+  });
+  var h = PQ.header || { company: 'ร้านสหกรณ์ มหาวิทยาลัยเชียงใหม่ จำกัด', title: 'รายการบาร์เดี่ยว/บาร์แพ็ค', statusText: '' };
+  return {
+    sheet: PQ.sheet || (S.cats && S.cats[0] && S.cats[0].sheet) || 'บาร์สินค้า',
+    cat: 'รายการกระจายสินค้า (' + rows.length + ' รายการ)',
+    last: { ts: nowMs() },
+    header: { company: h.company, title: h.title, statusText: 'วันที่พิมพ์ ' + thDate(nowMs()) + ' เวลา ' + thTime(nowMs()) + ' น.' },
+    rows: rows
+  };
+}
+if ($('#pqCode')) {
+  var pqInputTimer = null;
+  $('#pqCode').addEventListener('input', function () {
+    var q = this.value.trim();
+    PQ.picked = null;
+    clearTimeout(pqInputTimer);
+    if (!q) { pqSetPicked(null); pqRenderMatches([]); return; }
+    pqInputTimer = setTimeout(async function () {
+      try {
+        await pqEnsureAll();
+        var res = pqFindMatches($('#pqCode').value.trim());
+        if (res.exact) { pqSetPicked(res.exact); pqRenderMatches([]); }
+        else if (res.list.length) { pqSetPicked(null); pqRenderMatches(res.list); }
+        else { $('#pqPicked').textContent = 'ไม่พบสินค้าที่ตรงกับ "' + $('#pqCode').value.trim() + '"'; pqRenderMatches([]); }
+      } catch (e) { toast(e.message, true); }
+    }, 150);
+  });
+  $('#pqCode').addEventListener('keydown', async function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var q = this.value.trim();
+    if (!q) return;
+    try {
+      await pqEnsureAll();
+      var res = pqFindMatches(q);
+      var target = PQ.picked || res.exact || (res.list.length === 1 ? res.list[0] : null);
+      if (!target) {
+        if (res.list.length > 1) { pqRenderMatches(res.list); toast('พบหลายรายการ กรุณาคลิกเลือกรายการด้านล่าง'); }
+        else { toast('ไม่พบบาร์โค้ดหรือสินค้านี้ในระบบ', true); }
+        return;
+      }
+      pqSetPicked(target);
+      pqRenderMatches([]);
+      if ($('#pqSpread').value.trim() !== '') pqAddItem(target, $('#pqSpread').value);
+      else { $('#pqSpread').focus(); $('#pqSpread').select(); }
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#pqSpread').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); $('#pqAddBtn').click(); }
+  });
+  $('#pqMatches').addEventListener('click', function (e) {
+    var b = e.target.closest('.pq-match-item'); if (!b) return;
+    var list = $('#pqMatches')._list || [], row = list[Number(b.dataset.idx)];
+    if (!row) return;
+    pqSetPicked(row);
+    pqRenderMatches([]);
+    if ($('#pqSpread').value.trim() !== '') pqAddItem(row, $('#pqSpread').value);
+    else { $('#pqSpread').focus(); $('#pqSpread').select(); }
+  });
+  $('#pqAddBtn').addEventListener('click', async function () {
+    var q = $('#pqCode').value.trim();
+    try {
+      await pqEnsureAll();
+      var target = PQ.picked;
+      if (!target && q) {
+        var res = pqFindMatches(q);
+        target = res.exact || (res.list.length === 1 ? res.list[0] : null);
+        if (!target && res.list.length > 1) { pqRenderMatches(res.list); toast('พบหลายรายการ กรุณาคลิกเลือกรายการด้านล่าง', true); return; }
+      }
+      if (!target) { toast('กรุณากรอกบาร์โค้ดหรือเลือกสินค้าก่อน', true); $('#pqCode').focus(); return; }
+      pqAddItem(target, $('#pqSpread').value);
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#pqTbody').addEventListener('input', function (e) {
+    var inp = e.target.closest('.pq-spread-inp'); if (!inp) return;
+    var idx = Number(inp.dataset.pqIdx);
+    if (PQ.items[idx]) PQ.items[idx].spread = inp.value;
+  });
+  $('#pqTbody').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-pq-del]'); if (!b) return;
+    PQ.items.splice(Number(b.dataset.pqDel), 1);
+    pqRenderQueue();
+  });
+  $('#pqClearBtn').addEventListener('click', function () {
+    if (!PQ.items.length) return;
+    if (!confirm('ล้างรายการที่เตรียมปริ้นทั้งหมด ' + PQ.items.length + ' รายการ?')) return;
+    PQ.items = [];
+    pqRenderQueue();
+    $('#pqCode').focus();
+  });
+  $('#pqPrintBtn').addEventListener('click', async function () {
+    if (!PQ.items.length) { toast('เพิ่มรายการก่อนปริ้น', true); return; }
+    logUse('barcode', 'สร้าง PDF รายการกระจาย', PQ.items.length + ' รายการ');
+    var btn = this, label = btn.textContent; btn.textContent = 'กำลังสร้าง PDF…';
+    await busy(btn, async function () {
+      var ds = pqBuildDataset();
+      var blob = await buildPrintPdf([ds], []);
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      pdfUrl = URL.createObjectURL(blob);
+      var nm = 'รายการกระจายบาร์_' + thaiDayIso() + '.pdf';
+      $('#pdfName').textContent = nm + ' · ' + PQ.items.length + ' รายการ · ' + Math.round(blob.size / 1024) + ' KB';
+      $('#pdfOpen').href = pdfUrl; $('#pdfDl').href = pdfUrl; $('#pdfDl').setAttribute('download', nm);
+      $('#pdfModal').classList.remove('hidden');
+    });
+    btn.textContent = label;
+  });
+  $('#pqExcelBtn').addEventListener('click', function () {
+    if (!PQ.items.length) return;
+    if (typeof XLSX === 'undefined') { toast('โหลดตัวสร้าง Excel ไม่สำเร็จ', true); return; }
+    var ds = pqBuildDataset();
+    var headers = ['ลำดับ', 'รหัสคู่ค้า', 'หมวด', 'ชื่อรายการ', 'จำนวนต่อแพ็ค', 'เลขบาร์แพ็ค', 'จำนวนในระบบ แพ็ค', 'เลขบาร์เดี่ยว', 'จำนวนในระบบ เดี่ยว', 'กระจาย', 'ของเดิม'];
+    var aoa = [headers].concat(ds.rows.map(function (r) { return r.v; }));
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'รายการกระจาย');
+    XLSX.writeFile(wb, 'รายการกระจายบาร์_' + thaiDayIso() + '.xlsx');
+    toast('ส่งออก Excel แล้ว (' + PQ.items.length + ' รายการ)');
+  });
+}
 
 /* ============================ นำเข้า / ส่งออก / สำเนา (รายการบาร์) ============================ */
 var BC_BK = [];
@@ -2329,7 +2569,7 @@ function showLogin(msg) {
   document.querySelectorAll(".modalwrap,.overlay").forEach(function (dialog) { dialog.classList.add("hidden"); });
   if ($("#login")) $("#login").classList.remove("hidden");
   $("#lgErr").textContent = msg || ""; $("#lgPass").value = "";
-  $("#tbody").innerHTML = ""; $("#pList").innerHTML = ""; $("#catSide").innerHTML = "";
+  $("#tbody").innerHTML = ""; $("#pList").innerHTML = ""; $("#catSide").innerHTML = ""; PQ.all = null; PQ.picked = null; PQ.items = []; if ($("#pqTbody")) pqRenderQueue();
   setTimeout(function () { $("#lgUser").focus(); }, 50);
 }
 function hasPerm(k) { return !!(S.me && (S.me.role === "admin" || (S.me.perms && S.me.perms[k]))); }

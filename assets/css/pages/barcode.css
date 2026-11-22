@@ -508,3 +508,18 @@ td.act{white-space:nowrap;min-width:170px}
     .pair-bulk-cat { max-width:none; flex-basis:100% }
   }
 }
+
+/* ---------- ปริ้นเฉพาะรายการ (กรอกบาร์โค้ด + ช่องกระจาย) ---------- */
+.pq-box{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#faf8ff;margin-bottom:16px}
+.pq-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.pq-code-wrap{flex:1 1 260px;min-width:200px}
+.pq-spread-wrap{width:150px;flex:0 0 auto}
+.pq-picked{margin-top:6px;min-height:20px;font-size:13.5px;color:var(--ink)}
+.pq-matches{display:grid;gap:4px;max-height:200px;overflow:auto;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.pq-match-item{text-align:left;border:1px solid transparent;border-radius:8px;padding:7px 10px;background:#f8f5ff;display:grid;gap:2px}
+.pq-match-item:hover{border-color:var(--accent);background:var(--accent-soft)}
+.pq-match-item span{font-size:12px;color:var(--steel)}
+.pq-tablewrap{margin-top:10px;max-height:38vh}
+.pq-spread-inp{width:100%;padding:5px 8px!important;text-align:center;font-weight:600}
+.pq-sep{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media(max-width:640px){.pq-spread-wrap{width:100%}}
