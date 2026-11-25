@@ -541,9 +541,11 @@ td.act{white-space:nowrap;min-width:170px}
 .pq-acc-sub .pq-acc-title{font-size:14.5px}
 
 /* ---------- ตรวจเช็ครายการซ้ำ ---------- */
-.dup-list{display:grid;gap:10px;max-height:58vh;overflow:auto}
-.dup-group{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
-.dup-group-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#faf7ff;border-bottom:1px solid var(--line)}
+#bcDupModal .modal{display:flex;flex-direction:column;gap:12px}
+.dup-list{display:block;flex:1 1 auto;min-height:140px;max-height:58vh;overflow-y:auto;padding-right:4px}
+.dup-group{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:10px}
+.dup-group:last-child{margin-bottom:0}
+.dup-group-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#faf7ff;border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
 .dup-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid #f0eaf8}
 .dup-row:last-child{border-bottom:0}
 .dup-row.is-del{background:#fff5f5}
