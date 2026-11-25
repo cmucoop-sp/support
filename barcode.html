@@ -33,8 +33,7 @@
 <div class="layout single">
 <main id="wcag-main"><div class="workspace-intro"><div><span class="workspace-eyebrow">CMUCOOP WORKSPACE</span><h2>จัดการบาร์เดี่ยว / บาร์แพ็ค</h2><p>ค้นหารายการ เลือกหมวด จับคู่บาร์เดี่ยว/บาร์แพ็คจากชื่อที่คล้ายกัน หรือจัดพิมพ์รายงาน</p></div></div><div class="workspace-stats barcode-stats" id="barcodeStats" aria-label="สรุปรายการบาร์โค้ด"></div>
 <nav class="tabs">
-<button class="tab on" data-t="data">รายการสินค้า</button><button class="tab" data-t="manage">เพิ่มและนำเข้า <span class="tab-badge hidden" id="bcTempBadge">0</span></button><button class="tab" data-t="pair">จับคู่บาร์เดี่ยว/แพ็ค</button>
-<button class="tab" data-t="print">ปริ้นรายงาน</button>
+<button class="tab on" data-t="data">รายการสินค้า</button><button class="tab" data-t="manage">เพิ่มและนำเข้า <span class="tab-badge hidden" id="bcTempBadge">0</span></button><button class="tab" data-t="print">ปริ้นรายงาน</button>
 </nav>
 <!-- ========== แท็บข้อมูล ========== -->
 <section id="v-data" style="display:grid;gap:14px">
@@ -47,6 +46,8 @@
         <input type="search" id="bcCategorySearch" aria-label="ค้นหาหมวดสินค้า" placeholder="ค้นหาหมวดสินค้า…"/>
         <button class="btn ghost small" id="bcAllCategories" type="button">ดูทุกหมวด</button>
         <button class="btn ghost small" id="btnNewCat" type="button">+ สร้างหมวดใหม่</button>
+        <button class="btn ghost small hidden" id="btnEditCat" type="button">แก้ไขหมวด</button>
+        <button class="btn danger small hidden" id="btnDelCat" type="button">ลบหมวด</button>
       </div>
     </div>
     <div class="bc-cat-cur-meta">
@@ -78,13 +79,12 @@
 </nav>
 <div class="muted" style="margin-top:6px">ปุ่ม "แก้ไข" แก้ข้อมูลรายการ และปุ่ม "ลบ" ลบรายการออกจากชีต (ระบบบันทึกประวัติไว้ทุกครั้ง) ส่วนช่องจำนวนในระบบ / กระจาย / ของเดิม ไม่ต้องกรอกในระบบ เว้นไว้ให้เขียนบนกระดาษที่ปริ้น</div>
 </div></section>
-<section class="workspace-pane hidden" id="v-manage"><div class="workspace-section-title"><h3>เพิ่มรายการและจัดการไฟล์</h3><p>กรอกสินค้าใหม่ ตรวจสอบรายการชั่วคราวที่พนักงานส่งมา หรือนำเข้า Excel พร้อมสำรองข้อมูลเดิม</p></div>
+<section class="workspace-pane hidden" id="v-manage" style="display:grid;gap:12px">
 <div class="card hidden" id="bcTempAdminCard" style="border:1.5px solid #ccb6f1;background:#fcfaff">
   <div class="cardrow">
     <h3 style="margin:0">รายการชั่วคราวรอ Admin ตรวจสอบ <span class="tag" id="bcTempAdminCount">0</span></h3>
     <button class="btn ghost small" id="bcTempReloadBtn" type="button">โหลดรายการล่าสุด</button>
   </div>
-  <div class="muted" style="margin-bottom:8px">รายการที่พนักงานเพิ่มชั่วคราวตอนปริ้น · สามารถแก้ไขข้อมูลให้ถูกต้องก่อนกด <b>บันทึกเข้าระบบ</b> หรือ <b>ลบ</b> ได้</div>
   <div class="tablewrap" style="max-height:40vh">
     <table class="logt">
       <thead><tr><th>ผู้ส่ง / เวลา</th><th>หมวด / คู่ค้า</th><th>ชื่อรายการ</th><th>บาร์แพ็ค / บาร์เดี่ยว</th><th>กระจาย</th><th>จัดการ</th></tr></thead>
@@ -92,148 +92,166 @@
     </table>
   </div>
 </div>
-<div class="card">
-<h3>เพิ่มรายการ</h3>
-<div class="grid" id="addForm"></div>
-<div aria-live="polite" class="bchint" id="addBc"></div>
-<div class="addbar">
-<button class="btn" disabled="" id="btnAdd">เพิ่มรายการ</button>
-<span class="muted" id="addHint"></span>
-</div>
-<datalist id="dlCats"></datalist>
-</div><div class="card">
-<div class="cardrow"><h3>นำเข้าข้อมูลจากไฟล์ Excel</h3><span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn ghost small" type="button" hidden id="btnOpenPairTab">จับคู่บาร์เดี่ยว/แพ็คจากชื่อที่คล้ายกัน →</button><select aria-label="รูปแบบชีตส่งออก Excel" id="bcExpSheetMode" style="width:auto"><option value="single">ส่งออก: รวมทุกหมวดในชีตเดียว</option><option value="split">ส่งออก: แยกชีตตามหมวด (1 ชีต = 1 หมวด)</option></select><button class="btn ghost small" id="bcExpBtn">ส่งออก Excel</button><button class="btn ghost small" id="bcBkBtn">สำเนา (0/2)</button></span></div>
-<div class="row">
-<input accept=".xlsx,.xls,.csv" aria-label="ไฟล์นำเข้าบาร์โค้ด" id="bcImpFile" type="file"/>
-<select aria-label="ตัวเลือก bcImpMode" id="bcImpMode" style="width:auto"><option value="replace">แทนที่ข้อมูลทั้งหมด</option><option value="append">เพิ่มต่อท้าย (ข้ามรายการซ้ำ)</option></select>
-<button class="btn" disabled="" id="bcImpBtn">นำเข้า</button>
-</div>
-<div class="muted" id="bcImpHint" style="margin-top:6px">ข้อมูลเก็บในระบบคลาวด์ แก้ไขได้ที่หน้านี้ · แถวหัวตารางต้องมีคอลัมน์ "ชื่อสินค้า/ชื่อรายการ" และ "เลขบาร์แพ็ค" หรือ "เลขบาร์เดี่ยว" (มี "รหัสคู่ค้า" และ "หมวด" ด้วยก็ได้) · ถ้าไฟล์มีหลายแผ่นงานและไม่มีคอลัมน์หมวด ระบบใช้ชื่อแผ่นงานเป็นหมวด · ระบบทำสำเนาก่อนนำเข้าทุกครั้ง เก็บล่าสุด 2 ชุด</div>
-</div></section>
-<!-- ========== แท็บจับคู่บาร์เดี่ยว/บาร์แพ็คจากชื่อที่คล้ายกัน ========== -->
-<section class="workspace-pane hidden" id="v-pair" style="display:grid;gap:14px">
-  <div class="workspace-section-title">
-    <h3>จับคู่บาร์เดี่ยว / บาร์แพ็คอัตโนมัติจากชื่อที่คล้ายกัน</h3>
-    <p>อัปโหลดไฟล์รายการสินค้า ระบบจะตัดตัวอักษร P ออกจากรหัสบาร์ให้อัตโนมัติ ใช้ราคาที่ถูกกว่าเป็นบาร์เดี่ยว เทียบเช็ครายการซ้ำกับในระบบ ส่งออกตารางไปตรวจหน้าร้านเป็น Excel ได้ และบันทึกค้างไว้ชั่วคราวได้ 7 วัน</p>
-  </div>
-  <div class="card">
-    <div class="cardrow">
-      <h3>1. เลือกไฟล์สินค้าเพื่อวิเคราะห์ชื่อที่คล้ายกัน</h3>
-      <span class="muted">รองรับไฟล์รวมในไฟล์เดียว (มีแถวบาร์เดี่ยวและแถวบาร์แพ็คปนกัน) หรือแยก 2 ไฟล์ก็ได้</span>
-    </div>
-    <div class="pair-upload-grid">
-      <label>เลือกหมวดสินค้าก่อนอัพโหลด (ไม่จำเป็น)
-        <select id="bcPairCatSel" aria-label="เลือกหมวดสินค้าก่อนอัพโหลด (ไม่จำเป็น)">
-          <option value="">-- ไม่เลือกหมวด (เว้นว่างไว้ก่อน) --</option>
-        </select>
-        <input type="text" id="bcPairDefCat" class="hidden" list="dlCats" placeholder="พิมพ์ชื่อหมวดที่ต้องการใช้" style="margin-top:6px"/>
-      </label>
-      <label>ไฟล์รายการสินค้าหลัก (.xlsx, .xls, .csv)
-        <input type="file" id="bcPairFile" accept=".xlsx,.xls,.csv"/>
-      </label>
-      <label>ไฟล์บาร์แพ็คแยกต่างหาก (ถ้ามี · ไม่บังคับ)
-        <input type="file" id="bcPairPackFile" accept=".xlsx,.xls,.csv"/>
-      </label>
-      <label>ระดับความคล้ายของชื่อขั้นต่ำ
-        <select id="bcPairMinSim">
-          <option value="40">ตั้งแต่ 40% ขึ้นไป (ครอบคลุมกว้าง)</option>
-          <option value="50" selected>ตั้งแต่ 50% ขึ้นไป (แนะนำ)</option>
-          <option value="65">ตั้งแต่ 65% ขึ้นไป (คล้ายกันชัดเจน)</option>
-          <option value="75">ตั้งแต่ 75% ขึ้นไป (ใกล้เคียงมาก)</option>
-          <option value="85">ตั้งแต่ 85% ขึ้นไป (เกือบตรงกันทุกคำ)</option>
-        </select>
-      </label>
-    </div>
-    <div class="addbar" style="justify-content:space-between">
-      <label class="pair-chk-inline"><input type="checkbox" id="bcPairWithDb" checked/> นำรายการเดี่ยวในระบบที่ยังไม่มีคู่แพ็คมาช่วยจับคู่ด้วย</label>
-      <div class="row">
-        <button type="button" class="btn" id="bcPairAnalyzeBtn" disabled>วิเคราะห์และแสดงคู่ที่ชื่อคล้ายกัน</button>
-      </div>
-    </div>
-    <div class="pair-draft-bar hidden" id="bcPairDraftBar">
-      <div class="pair-draft-info">
-        <span class="dot ok"></span>
-        <span id="bcPairDraftStatus">บันทึกไว้ชั่วคราว (เก็บไว้ได้ 7 วัน)</span>
-      </div>
-      <div class="row">
-        <button type="button" class="btn ghost small" id="bcPairSaveDraftBtn">บันทึกชั่วคราว 7 วัน</button>
-        <button type="button" class="btn ghost small" id="bcPairClearDraftBtn">ล้างข้อมูลชั่วคราว</button>
-      </div>
-    </div>
-    <div class="muted" id="bcPairHint" style="margin-top:6px">ระบบตัดตัว P ออกจากเลขบาร์ให้อัตโนมัติ · ราคาที่ถูกกว่าจะเป็น "บาร์เดี่ยว" · คอลัมน์ Vender เป็น "รหัสคู่ค้า" · ไม่กรอกหมวดให้อัตโนมัติหากไม่ได้เลือกหมวดไว้ล่วงหน้า · หากเลขบาร์มีในระบบแล้วจะแจ้งเตือนให้เลือกก่อนบันทึกทับ</div>
-  </div>
 
-  <div class="card hidden" id="bcPairResultCard">
-    <div class="pair-head-top">
-      <div>
-        <h3 id="bcPairReviewTitle" style="margin:0 0 4px">2. ตรวจสอบคู่บาร์เดี่ยว / บาร์แพ็ค</h3>
-        <div class="pair-summary-badges" id="bcPairSummaryText" role="status" aria-live="polite"></div>
-      </div>
-      <div class="pair-head-actions">
-        <button type="button" class="btn ghost pair-export-btn" id="bcPairExportBtn">ส่งออก Excel</button>
-        <button type="button" class="btn" id="bcPairConfirmSelectedBtn">บันทึกคู่ที่เลือก</button>
-      </div>
+<details class="card pq-acc" id="bcAddAcc" open>
+  <summary class="pq-acc-sum">
+    <span class="pq-acc-title">เพิ่มรายการ</span>
+  </summary>
+  <div class="pq-acc-body">
+    <div class="grid" id="addForm"></div>
+    <div aria-live="polite" class="bchint" id="addBc"></div>
+    <div class="addbar">
+      <button class="btn" disabled="" id="btnAdd">เพิ่มรายการ</button>
+      <span class="muted" id="addHint"></span>
     </div>
+    <datalist id="dlCats"></datalist>
+  </div>
+</details>
 
-    <div class="pair-toolbar">
-      <div class="pair-toolbar-left">
-        <input type="search" id="bcPairSearch" aria-label="ค้นหาคู่บาร์" placeholder="ค้นหาชื่อสินค้า รหัสคู่ค้า หรือเลขบาร์"/>
-        <select id="bcPairFilterMode" aria-label="กรองรายการจับคู่">
-          <option value="all">แสดงทั้งหมด</option>
-          <option value="new">เฉพาะรายการใหม่ (ยังไม่มีในระบบ)</option>
-          <option value="dup">เฉพาะที่มีในระบบแล้ว (ซ้ำ)</option>
-          <option value="selected">เฉพาะที่ติ๊กเลือกไว้</option>
-        </select>
-        <div class="pair-bulk-cat">
-          <input type="text" id="bcPairBulkCatInput" list="dlCats" aria-label="กำหนดหมวดให้คู่ที่เลือก" placeholder="เลือก/พิมพ์หมวดให้คู่ที่ติ๊ก…"/>
-          <button type="button" class="btn ghost small" id="bcPairApplyBulkCatBtn">ใช้หมวดกับที่เลือก</button>
+<details class="card pq-acc" id="bcImpAcc">
+  <summary class="pq-acc-sum">
+    <span class="pq-acc-title">นำเข้าข้อมูลจากไฟล์ Excel</span>
+  </summary>
+  <div class="pq-acc-body">
+    <div class="row" style="justify-content:flex-end;margin-bottom:10px">
+      <button class="btn ghost small" type="button" hidden id="btnOpenPairTab">จับคู่บาร์เดี่ยว / บาร์แพ็ค</button>
+      <select aria-label="รูปแบบชีตส่งออก Excel" id="bcExpSheetMode" style="width:auto"><option value="single">ส่งออก: รวมทุกหมวดในชีตเดียว</option><option value="split">ส่งออก: แยกชีตตามหมวด</option></select>
+      <button class="btn ghost small" id="bcExpBtn">ส่งออก Excel</button>
+      <button class="btn ghost small" id="bcBkBtn">สำเนา</button>
+    </div>
+    <div class="row">
+      <input accept=".xlsx,.xls,.csv" aria-label="ไฟล์นำเข้าบาร์โค้ด" id="bcImpFile" type="file"/>
+      <select aria-label="ตัวเลือก bcImpMode" id="bcImpMode" style="width:auto"><option value="replace">แทนที่ข้อมูลทั้งหมด</option><option value="append">เพิ่มต่อท้าย</option></select>
+      <button class="btn" disabled="" id="bcImpBtn">นำเข้า</button>
+    </div>
+    <div class="muted" id="bcImpHint" style="margin-top:6px"></div>
+  </div>
+</details>
+
+<details class="card pq-acc" id="bcPairAcc">
+  <summary class="pq-acc-sum">
+    <span class="pq-acc-title">จับคู่บาร์เดี่ยว / บาร์แพ็ค</span>
+  </summary>
+  <div class="pq-acc-body" style="display:grid;gap:14px">
+    <div>
+      <div class="cardrow">
+        <h3 style="margin:0">1. เลือกไฟล์สินค้าเพื่อวิเคราะห์ชื่อที่คล้ายกัน</h3>
+      </div>
+      <div class="pair-upload-grid">
+        <label>เลือกหมวดสินค้าก่อนอัพโหลด
+          <select id="bcPairCatSel" aria-label="เลือกหมวดสินค้าก่อนอัพโหลด">
+            <option value="">-- ไม่เลือกหมวด --</option>
+          </select>
+          <input type="text" id="bcPairDefCat" class="hidden" list="dlCats" placeholder="พิมพ์ชื่อหมวดที่ต้องการใช้" style="margin-top:6px"/>
+        </label>
+        <label>ไฟล์รายการสินค้าหลัก
+          <input type="file" id="bcPairFile" accept=".xlsx,.xls,.csv"/>
+        </label>
+        <label>ไฟล์บาร์แพ็คแยกต่างหาก
+          <input type="file" id="bcPairPackFile" accept=".xlsx,.xls,.csv"/>
+        </label>
+        <label>ระดับความคล้ายของชื่อขั้นต่ำ
+          <select id="bcPairMinSim">
+            <option value="40">ตั้งแต่ 40% ขึ้นไป</option>
+            <option value="50" selected>ตั้งแต่ 50% ขึ้นไป</option>
+            <option value="65">ตั้งแต่ 65% ขึ้นไป</option>
+            <option value="75">ตั้งแต่ 75% ขึ้นไป</option>
+            <option value="85">ตั้งแต่ 85% ขึ้นไป</option>
+          </select>
+        </label>
+      </div>
+      <div class="addbar" style="justify-content:space-between">
+        <label class="pair-chk-inline"><input type="checkbox" id="bcPairWithDb" checked/> นำรายการเดี่ยวในระบบที่ยังไม่มีคู่แพ็คมาช่วยจับคู่ด้วย</label>
+        <div class="row">
+          <button type="button" class="btn" id="bcPairAnalyzeBtn" disabled>วิเคราะห์และแสดงคู่ที่ชื่อคล้ายกัน</button>
         </div>
       </div>
-      <div class="pair-toolbar-right">
-        <details class="v16-more pair-bulk-menu">
-          <summary>เลือกหลายรายการ <span aria-hidden="true">▾</span></summary>
-          <div class="v16-more-panel">
-            <button type="button" class="btn ghost small" id="bcPairSelectAllBtn">เลือกทั้งหมด</button>
-            <button type="button" class="btn ghost small" id="bcPairSelectNewBtn">เลือกเฉพาะรายการใหม่</button>
-            <button type="button" class="btn ghost small" id="bcPairSelectHighBtn">เลือกความคล้าย ≥ 70%</button>
-            <button type="button" class="btn ghost small" id="bcPairClearSelBtn">ล้างที่เลือก</button>
+      <div class="pair-draft-bar hidden" id="bcPairDraftBar">
+        <div class="pair-draft-info">
+          <span class="dot ok"></span>
+          <span id="bcPairDraftStatus">บันทึกไว้ชั่วคราว</span>
+        </div>
+        <div class="row">
+          <button type="button" class="btn ghost small" id="bcPairSaveDraftBtn">บันทึกชั่วคราว 7 วัน</button>
+          <button type="button" class="btn ghost small" id="bcPairClearDraftBtn">ล้างข้อมูลชั่วคราว</button>
+        </div>
+      </div>
+      <div class="muted" id="bcPairHint" style="margin-top:6px"></div>
+    </div>
+
+    <div class="hidden" id="bcPairResultCard" style="border-top:1px solid var(--line);padding-top:14px">
+      <div class="pair-head-top">
+        <div>
+          <h3 id="bcPairReviewTitle" style="margin:0 0 4px">2. ตรวจสอบคู่บาร์เดี่ยว / บาร์แพ็ค</h3>
+          <div class="pair-summary-badges" id="bcPairSummaryText" role="status" aria-live="polite"></div>
+        </div>
+        <div class="pair-head-actions">
+          <button type="button" class="btn ghost pair-export-btn" id="bcPairExportBtn">ส่งออก Excel</button>
+          <button type="button" class="btn" id="bcPairConfirmSelectedBtn">บันทึกคู่ที่เลือก</button>
+        </div>
+      </div>
+
+      <div class="pair-toolbar">
+        <div class="pair-toolbar-left">
+          <input type="search" id="bcPairSearch" aria-label="ค้นหาคู่บาร์" placeholder="ค้นหาชื่อสินค้า รหัสคู่ค้า หรือเลขบาร์"/>
+          <select id="bcPairFilterMode" aria-label="กรองรายการจับคู่">
+            <option value="all">แสดงทั้งหมด</option>
+            <option value="new">เฉพาะรายการใหม่</option>
+            <option value="dup">เฉพาะที่มีในระบบแล้ว</option>
+            <option value="selected">เฉพาะที่ติ๊กเลือกไว้</option>
+          </select>
+          <div class="pair-bulk-cat">
+            <input type="text" id="bcPairBulkCatInput" list="dlCats" aria-label="กำหนดหมวดให้คู่ที่เลือก" placeholder="เลือก/พิมพ์หมวดให้คู่ที่ติ๊ก…"/>
+            <button type="button" class="btn ghost small" id="bcPairApplyBulkCatBtn">ใช้หมวดกับที่เลือก</button>
           </div>
-        </details>
+        </div>
+        <div class="pair-toolbar-right">
+          <details class="v16-more pair-bulk-menu">
+            <summary>เลือกหลายรายการ <span aria-hidden="true">▾</span></summary>
+            <div class="v16-more-panel">
+              <button type="button" class="btn ghost small" id="bcPairSelectAllBtn">เลือกทั้งหมด</button>
+              <button type="button" class="btn ghost small" id="bcPairSelectNewBtn">เลือกเฉพาะรายการใหม่</button>
+              <button type="button" class="btn ghost small" id="bcPairSelectHighBtn">เลือกความคล้าย ≥ 70%</button>
+              <button type="button" class="btn ghost small" id="bcPairClearSelBtn">ล้างที่เลือก</button>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="tablewrap pair-tablewrap" role="region" aria-labelledby="bcPairReviewTitle" tabindex="0">
+        <table class="dt pair-dt" aria-labelledby="bcPairReviewTitle">
+          <thead>
+            <tr>
+              <th scope="col" class="pair-col-select">เลือก</th>
+              <th scope="col" class="pair-col-source">รายการจากไฟล์</th>
+              <th scope="col" class="pair-col-status">ความคล้าย / สถานะ</th>
+              <th scope="col" class="pair-col-product">ข้อมูลสินค้า</th>
+              <th scope="col" class="pair-col-bars">บาร์ที่จะบันทึก</th>
+              <th scope="col" class="pair-col-actions">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="bcPairTbody"></tbody>
+        </table>
       </div>
     </div>
 
-    <div class="tablewrap pair-tablewrap" role="region" aria-labelledby="bcPairReviewTitle" tabindex="0">
-      <table class="dt pair-dt" aria-labelledby="bcPairReviewTitle">
-        <thead>
-          <tr>
-            <th scope="col" class="pair-col-select">เลือก</th>
-            <th scope="col" class="pair-col-source">รายการจากไฟล์</th>
-            <th scope="col" class="pair-col-status">ความคล้าย / สถานะ</th>
-            <th scope="col" class="pair-col-product">ข้อมูลสินค้า</th>
-            <th scope="col" class="pair-col-bars">บาร์ที่จะบันทึก</th>
-            <th scope="col" class="pair-col-actions">จัดการ</th>
-          </tr>
-        </thead>
-        <tbody id="bcPairTbody"></tbody>
-      </table>
+    <div class="hidden" id="bcPairManualCard" style="border-top:1px solid var(--line);padding-top:14px">
+      <div class="cardrow">
+        <h3 style="margin:0">3. จับคู่เพิ่มเติมด้วยตนเอง</h3>
+        <span class="muted" id="bcPairUnmatchedCount"></span>
+      </div>
+      <div class="pair-manual-grid">
+        <label>เลือกรายการที่ 1
+          <select id="bcPairManualUnit"></select>
+        </label>
+        <label>เลือกรายการที่ 2
+          <select id="bcPairManualPack"></select>
+        </label>
+        <button type="button" class="btn ghost" id="bcPairManualAddBtn">+ นำมาจับคู่เพิ่มในตารางด้านบน</button>
+      </div>
     </div>
   </div>
-
-  <div class="card hidden" id="bcPairManualCard">
-    <div class="cardrow">
-      <h3>3. จับคู่เพิ่มเติมด้วยตนเอง (สำหรับรายการที่ชื่อต่างกันหรือยังไม่ถูกจับคู่)</h3>
-      <span class="muted" id="bcPairUnmatchedCount"></span>
-    </div>
-    <div class="pair-manual-grid">
-      <label>เลือกรายการที่ 1 (ถ้าราคาถูกกว่าจะเป็นบาร์เดี่ยวอัตโนมัติ)
-        <select id="bcPairManualUnit"></select>
-      </label>
-      <label>เลือกรายการที่ 2 (ถ้าราคาสูงกว่าจะเป็นบาร์แพ็คอัตโนมัติ)
-        <select id="bcPairManualPack"></select>
-      </label>
-      <button type="button" class="btn ghost" id="bcPairManualAddBtn">+ นำมาจับคู่เพิ่มในตารางด้านบน</button>
-    </div>
-  </div>
+</details>
 </section>
 <!-- ========== แท็บปริ้น ========== -->
 <section class="hidden" id="v-print" style="display:grid;gap:12px">
@@ -398,7 +416,7 @@
 <div id="printArea"></div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/barcode-export.js?v=16.4"></script>
-<script src="assets/js/pages/barcode.js?v=16.21"></script>
+<script src="assets/js/pages/barcode.js?v=16.22"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

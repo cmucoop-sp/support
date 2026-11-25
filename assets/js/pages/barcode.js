@@ -196,7 +196,7 @@ if ($('#bcPairCatSel')) {
   });
 }
 $('#btnNewCat').addEventListener('click', async function () {
-  var name = (prompt('ชื่อหมวดใหม่ (เช่น ขนม, นม, บะหมี่)') || '').trim();
+  var name = (prompt('ชื่อหมวดใหม่') || '').trim();
   if (!name) return;
   try {
     var r = await withSaving(call('createCategory', name));
@@ -205,6 +205,36 @@ $('#btnNewCat').addEventListener('click', async function () {
     await selectCat(r.key);
   } catch (e) { toast(e.message, true); }
 });
+if ($('#btnEditCat')) {
+  $('#btnEditCat').addEventListener('click', async function () {
+    var c = curCat();
+    if (!c || c.cat === '*') return;
+    var next = (prompt('แก้ไขชื่อหมวด "' + c.cat + '" เป็น:', c.cat) || '').trim();
+    if (!next || next === c.cat) return;
+    try {
+      var r = await withSaving(call('renameCategory', c.cat, next));
+      toast('เปลี่ยนชื่อหมวดเป็น ' + next + ' แล้ว');
+      PQ.all = null;
+      await refreshCats();
+      await selectCat(r.key);
+    } catch (e) { toast(e.message, true); }
+  });
+}
+if ($('#btnDelCat')) {
+  $('#btnDelCat').addEventListener('click', async function () {
+    var c = curCat();
+    if (!c || c.cat === '*') return;
+    var msg = c.items ? 'ลบหมวด "' + c.cat + '" และรายการสินค้าทั้งหมด ' + c.items + ' รายการในหมวดนี้?' : 'ลบหมวด "' + c.cat + '"?';
+    if (!confirm(msg)) return;
+    try {
+      await withSaving(call('deleteCategory', c.cat));
+      toast('ลบหมวด "' + c.cat + '" แล้ว');
+      PQ.all = null;
+      await refreshCats();
+      await selectCat(allCat().key);
+    } catch (e) { toast(e.message, true); }
+  });
+}
 $('#catSide').addEventListener('click', function (e) {
   var b = e.target.closest('.cat'); if (b) selectCat(b.dataset.k);
 });
@@ -222,6 +252,9 @@ async function selectCat(key) {
   if (!c) return;
   var loadId = ++categoryLoadId, token = S.token;
   S.cur = key; S.data = null; renderSide();
+  var isSingleCat = !!(c && c.cat && !c.all);
+  if ($('#btnEditCat')) $('#btnEditCat').classList.toggle('hidden', !isSingleCat);
+  if ($('#btnDelCat')) $('#btnDelCat').classList.toggle('hidden', !isSingleCat);
   $('#btnAdd').disabled = true; $('#count').textContent = '';
   $('#addForm').innerHTML = '';
   closeEdit();
@@ -1258,7 +1291,7 @@ if ($('#pqCode')) {
 var BC_BK = [];
 function bcBkFmt(ts) { return new Date(ts).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' }); }
 function bcBkRender() {
-  $('#bcBkBtn').textContent = 'สำเนา (' + BC_BK.length + '/2)';
+  $('#bcBkBtn').textContent = 'สำเนา ' + BC_BK.length + '/2';
   $('#bcBkList').innerHTML = BC_BK.length ? '<table class="logt"><thead><tr><th>#</th><th>เวลา</th><th>ข้อมูล</th><th></th></tr></thead><tbody>' +
     BC_BK.map(function (b, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(bcBkFmt(b.ts)) + '</td><td>' + esc(b.name) + '</td><td class="act"><div class="actw"><button class="btn ghost small" data-dl="' + b.id + '">ดาวน์โหลด CSV</button><button class="btn ghost small" data-rs="' + b.id + '">กู้คืน</button></div></td></tr>'; }).join('') + '</tbody></table>'
     : '<div class="muted">ยังไม่มีสำเนา</div>';
@@ -2432,7 +2465,7 @@ async function confirmAndSavePairItems(pairObjs) {
 }
 
 if ($("#btnOpenPairTab")) {
-  $("#btnOpenPairTab").addEventListener("click", function () { switchTab("pair"); });
+  $("#btnOpenPairTab").addEventListener("click", function () { switchTab("manage"); if ($("#bcPairAcc")) { $("#bcPairAcc").open = true; $("#bcPairAcc").scrollIntoView({ behavior: "smooth", block: "start" }); } });
 }
 if ($("#bcPairFile")) {
   $("#bcPairFile").addEventListener("change", function () {
@@ -2759,14 +2792,21 @@ if ($('#bcTempAdminTbody')) {
 
 /* ============================ ประวัติ / แท็บ ============================ */
 function switchTab(t) {
+  if (t === "pair") t = "manage";
   if (S.me && S.me.role !== "admin" && t !== "print") t = "print";
   document.querySelectorAll(".tab").forEach(function (x) { var on=x.dataset.t===t;x.classList.toggle("on",on);x.setAttribute("aria-selected",String(on));x.tabIndex=on?0:-1; });
-  ["data", "manage", "pair", "print"].forEach(function (k) { if ($("#v-" + k)) $("#v-" + k).classList.toggle("hidden", k !== t); });
-  if ($(".layout")) $(".layout").classList.toggle("pair-mode", t === "pair");
+  ["data", "manage", "print"].forEach(function (k) { if ($("#v-" + k)) $("#v-" + k).classList.toggle("hidden", k !== t); });
+  if ($(".layout")) $(".layout").classList.toggle("pair-mode", t === "manage" && $("#bcPairAcc") && $("#bcPairAcc").open);
   if (t === "print") renderPrintList();
-  if (t === "pair") {
+  if (t === "manage" && $("#bcPairAcc") && $("#bcPairAcc").open) {
     ensureDbBarMapLoaded().then(function () { renderPairTable(); });
   }
+}
+if ($("#bcPairAcc")) {
+  $("#bcPairAcc").addEventListener("toggle", function () {
+    if ($(".layout")) $(".layout").classList.toggle("pair-mode", this.open && !$("#v-manage").classList.contains("hidden"));
+    if (this.open) ensureDbBarMapLoaded().then(function () { renderPairTable(); });
+  });
 }
 document.querySelector(".tabs").addEventListener("click", function (e) {
   var b = e.target.closest(".tab"); if (!b) return;
