@@ -15,7 +15,7 @@
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/shared/app.css?v=16.2" rel="stylesheet"/><link href="assets/css/shared/workspace-ui.css?v=16.2" rel="stylesheet"/><script src="assets/js/shared/workspace-ui.js?v=16.2" defer></script>
-<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.19">
+<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.21">
 <link rel="stylesheet" href="assets/css/shared/dashboard-v16.css?v=16.7">
 <script src="assets/js/shared/dashboard-v16.js?v=16.7" defer></script>
 <meta name="theme-color" content="#ede5fa">
@@ -236,64 +236,89 @@
   </div>
 </section>
 <!-- ========== แท็บปริ้น ========== -->
-<section class="card hidden" id="v-print">
-<div class="pq-box" id="pqBox">
-  <div class="cardrow">
-    <h3 style="margin:0">ปริ้นเฉพาะรายการ (กรอกบาร์โค้ด + จำนวนกระจาย)</h3>
-    <span class="muted" id="pqCount">ยังไม่มีรายการที่เตรียมปริ้น</span>
-  </div>
-  <div class="muted" style="margin-bottom:8px">ยิงหรือพิมพ์เลขบาร์แพ็ค / บาร์เดี่ยว หรือชื่อสินค้า แล้วกรอกจำนวนช่อง <b>กระจาย</b> เพิ่มหลายรายการแล้วปริ้น PDF ทีเดียว</div>
-  <div class="pq-row">
-    <label class="pq-code-wrap">บาร์โค้ด หรือ ชื่อสินค้า
-      <input id="pqCode" type="search" autocomplete="off" placeholder="ยิง/พิมพ์เลขบาร์แพ็ค บาร์เดี่ยว หรือชื่อสินค้า"/>
-    </label>
-    <label class="pq-spread-wrap">จำนวน (ช่องกระจาย)
-      <input id="pqSpread" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 5"/>
-    </label>
-    <button class="btn" id="pqAddBtn" type="button" style="align-self:end">+ เพิ่มรายการ</button>
-    <button class="btn ghost" id="pqTempBtn" type="button" style="align-self:end">+ เพิ่มรายการที่ไม่มีชั่วคราว</button>
-  </div>
-  <div class="pq-draft-info muted hidden" id="pqDraftInfo" aria-live="polite"></div>
-  <div class="pq-picked muted" id="pqPicked" aria-live="polite"></div>
-  <div class="pq-matches hidden" id="pqMatches"></div>
-  <div class="tablewrap pq-tablewrap hidden" id="pqTableWrap">
-    <table class="logt pq-table">
-      <thead>
-        <tr>
-          <th style="width:48px">ลำดับ</th>
-          <th>หมวด / คู่ค้า</th>
-          <th>ชื่อรายการ</th>
-          <th>บาร์แพ็ค / บาร์เดี่ยว</th>
-          <th style="width:120px">กระจาย</th>
-          <th style="width:64px"></th>
-        </tr>
-      </thead>
-      <tbody id="pqTbody"></tbody>
-    </table>
-  </div>
-  <div class="row" style="margin-top:10px">
-    <button class="btn" id="pqPrintBtn" type="button" disabled>ปริ้นรายการที่เลือก (PDF)</button>
-    <button class="btn ghost" id="pqExcelBtn" type="button" disabled>ส่งออก Excel</button>
-    <button class="btn ghost small" id="pqClearBtn" type="button" disabled>ล้างรายการ</button>
-  </div>
-</div>
-<hr class="pq-sep"/>
-<h3>เลือกหมวดที่ต้องการปริ้น (ทั้งหมวด)</h3>
-<label class="pgroup" style="margin-top:0"><input id="pAll" type="checkbox"/> เลือกทุกหมวด</label>
-<div class="plist" id="pList"></div>
-<div class="pgroup" style="margin-top:6px">เลือกเฉพาะรหัสคู่ค้า <span class="muted" style="font-weight:400">(ไม่เลือกเลย = ปริ้นทุกรหัส)</span>
-<button class="btn ghost small" id="pPartnerClear" type="button">ล้างที่เลือก</button></div>
-<div class="plist" id="pPartners" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:30vh"></div>
-<div class="pgroup" style="margin-top:12px;flex-wrap:wrap">ฟอนต์ตอนปริ้น
+<section class="hidden" id="v-print" style="display:grid;gap:12px">
+  <details class="card pq-acc" id="pqBox" open>
+    <summary class="pq-acc-sum">
+      <span class="pq-acc-title">ปริ้นเฉพาะรายการ</span>
+      <span class="muted" id="pqCount">ยังไม่มีรายการที่เตรียมปริ้น</span>
+    </summary>
+    <div class="pq-acc-body">
+      <div class="pq-row">
+        <label class="pq-code-wrap">บาร์โค้ด หรือ ชื่อสินค้า
+          <input id="pqCode" type="search" autocomplete="off" placeholder="ยิง/พิมพ์เลขบาร์แพ็ค บาร์เดี่ยว หรือชื่อสินค้า"/>
+        </label>
+        <label class="pq-spread-wrap">จำนวน (ช่องกระจาย)
+          <input id="pqSpread" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 5"/>
+        </label>
+        <button class="btn" id="pqAddBtn" type="button" style="align-self:end">+ เพิ่มรายการ</button>
+        <button class="btn ghost" id="pqTempBtn" type="button" style="align-self:end">+ เพิ่มรายการที่ไม่มีชั่วคราว</button>
+      </div>
+      <div class="pq-draft-info muted hidden" id="pqDraftInfo" aria-live="polite"></div>
+      <div class="pq-picked muted" id="pqPicked" aria-live="polite"></div>
+      <div class="pq-matches hidden" id="pqMatches"></div>
+      <div class="tablewrap pq-tablewrap hidden" id="pqTableWrap">
+        <table class="logt pq-table">
+          <thead>
+            <tr>
+              <th style="width:48px">ลำดับ</th>
+              <th>หมวด / คู่ค้า</th>
+              <th>ชื่อรายการ</th>
+              <th>บาร์แพ็ค / บาร์เดี่ยว</th>
+              <th style="width:120px">กระจาย</th>
+              <th style="width:64px"></th>
+            </tr>
+          </thead>
+          <tbody id="pqTbody"></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="pqPrintBtn" type="button" disabled>ปริ้นรายการที่เลือก (PDF)</button>
+        <button class="btn ghost" id="pqExcelBtn" type="button" disabled>ส่งออก Excel</button>
+        <button class="btn ghost small" id="pqClearBtn" type="button" disabled>ล้างรายการ</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="card pq-acc" id="pqAccCat">
+    <summary class="pq-acc-sum">
+      <span class="pq-acc-title">เลือกหมวดที่ต้องการปริ้น (ทั้งหมวด)</span>
+      <span class="muted" id="pCatSum">ยังไม่ได้เลือก</span>
+    </summary>
+    <div class="pq-acc-body">
+      <label class="pgroup" style="margin-top:0"><input id="pAll" type="checkbox"/> เลือกทุกหมวด</label>
+      <div class="plist" id="pList"></div>
+      <details class="pq-acc pq-acc-sub" id="pqAccPartner">
+        <summary class="pq-acc-sum">
+          <span class="pq-acc-title">เลือกเฉพาะรหัสคู่ค้า <span class="muted" style="font-weight:400">(ไม่เลือกเลย = ปริ้นทุกรหัส)</span></span>
+          <span class="muted" id="pPartSum">ทุกรหัส</span>
+        </summary>
+        <div class="pq-acc-body">
+          <div class="row" style="margin-bottom:6px"><button class="btn ghost small" id="pPartnerClear" type="button">ล้างที่เลือก</button></div>
+          <div class="plist" id="pPartners" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:30vh;margin:0"></div>
+        </div>
+      </details>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="btnPrint">ปริ้นรายงาน</button>
+        <button class="btn ghost" id="btnPrintExcel" type="button">ส่งออก Excel</button>
+        <button class="btn ghost hidden" id="btnPrintOld">ปริ้นจากเบราว์เซอร์ (สำรอง)</button>
+        <span class="muted">หมวดละเริ่มหน้าใหม่ หัวตารางพิมพ์ซ้ำทุกหน้า กระดาษ A4 แนวตั้ง</span>
+      </div>
+    </div>
+  </details>
+
+  <details class="card pq-acc hidden" id="pFontAcc">
+    <summary class="pq-acc-sum">
+      <span class="pq-acc-title">ฟอนต์ตอนปริ้น</span>
+      <span class="muted" id="pFontSum"></span>
+    </summary>
+    <div class="pq-acc-body">
+      <div class="pgroup" style="margin-top:0;flex-wrap:wrap">ฟอนต์ตอนปริ้น
         <select aria-label="ตัวเลือก pFont" id="pFont"></select>
-<span class="muted" id="pFontNote" style="font-weight:400"></span></div>
-<div id="pFontSample" style="margin-top:6px;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;font-size:18px;background:#fff">ตัวอย่าง: รายการบาร์เดี่ยว/บาร์แพ็ค 8851234567890 ก ข ค ฎ ฏ ญ ฐ ไก่ ป่า ผู้ ปี้</div>
-<div class="row" style="margin-top:12px">
-<button class="btn" id="btnPrint">ปริ้นรายงาน</button>
-<button class="btn ghost" id="btnPrintExcel" type="button">ส่งออก Excel</button>
-<button class="btn ghost hidden" id="btnPrintOld">ปริ้นจากเบราว์เซอร์ (สำรอง)</button>
-<span class="muted">หมวดละเริ่มหน้าใหม่ หัวตารางพิมพ์ซ้ำทุกหน้า กระดาษ A4 แนวตั้ง</span>
-</div>
+        <span class="muted" id="pFontNote" style="font-weight:400"></span>
+      </div>
+      <div id="pFontSample" style="margin-top:8px;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;font-size:18px;background:#fff">ตัวอย่าง: รายการบาร์เดี่ยว/บาร์แพ็ค 8851234567890 ก ข ค ฎ ฏ ญ ฐ ไก่ ป่า ผู้ ปี้</div>
+    </div>
+  </details>
 </section>
 </main>
 </div>
@@ -373,7 +398,7 @@
 <div id="printArea"></div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/barcode-export.js?v=16.4"></script>
-<script src="assets/js/pages/barcode.js?v=16.19"></script>
+<script src="assets/js/pages/barcode.js?v=16.21"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

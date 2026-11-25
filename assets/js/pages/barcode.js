@@ -464,6 +464,12 @@ function renderPrintList() {
   renderPartners();
 }
 var pSel = {};
+function updatePrintSummaries() {
+  var cN = checkedCatKeys().length;
+  if ($('#pCatSum')) $('#pCatSum').textContent = cN ? 'เลือกแล้ว ' + cN + ' หมวด' : 'ยังไม่ได้เลือก';
+  var pN = selectedPartners().length;
+  if ($('#pPartSum')) $('#pPartSum').textContent = pN ? 'เลือกแล้ว ' + pN + ' รหัส' : 'ทุกรหัส';
+}
 function renderPartners() {
   var keys = checkedCatKeys();
   var cats = S.cats.filter(function (c) { return !keys.length || keys.indexOf(c.key) >= 0; });
@@ -474,11 +480,12 @@ function renderPartners() {
     return '<label class="pitem"><input type="checkbox" class="ppchk" value="' + esc(p) + '"' + (pSel[p] ? ' checked' : '') + '><span><b>' + esc(p) +
       '</b> <span class="muted">' + tot[p] + ' รายการ</span></span></label>';
   }).join('') || '<div class="muted">ไม่มีรหัสคู่ค้า</div>';
+  updatePrintSummaries();
 }
 function selectedPartners() {
   return Array.prototype.map.call(document.querySelectorAll('.ppchk:checked'), function (x) { return x.value; });
 }
-$('#pPartners').addEventListener('change', function (e) { var i = e.target.closest('.ppchk'); if (i) pSel[i.value] = i.checked; });
+$('#pPartners').addEventListener('change', function (e) { var i = e.target.closest('.ppchk'); if (i) { pSel[i.value] = i.checked; updatePrintSummaries(); } });
 $('#pPartnerClear').addEventListener('click', function () { pSel = {}; renderPartners(); });
 $('#pList').addEventListener('change', function (e) {
   var g = e.target.closest('.pgrp');
@@ -806,8 +813,11 @@ async function pfRender(font, list) {
   if (list && !sel.options.length) sel.innerHTML = list.map(function (f) { return '<option>' + esc(f) + '</option>'; }).join('');
   applyPrintFont(font); sel.value = PRINT_FONT;
   var admin = S.me && S.me.role === 'admin';
+  if ($('#pFontAcc')) $('#pFontAcc').classList.toggle('hidden', !admin);
+  if ($('#pFontSum')) $('#pFontSum').textContent = PRINT_FONT;
   sel.disabled = !admin;
-  $('#pFontNote').textContent = admin ? 'Admin ตั้งได้ · ใช้กับทุกคนที่ปริ้นรายงาน' : 'ตั้งโดย Admin (เฉพาะ Admin เปลี่ยนได้)';
+  $('#pFontNote').textContent = 'Admin ตั้งได้ · ใช้กับทุกคนที่ปริ้นรายงาน';
+  if (!admin) return;
   $('#pFontSample').style.fontFamily = PDF_FONT;
   await ensureThaiFont();
   $('#pFontSample').style.fontFamily = PDF_FONT;
@@ -959,7 +969,7 @@ function pqUpdateDraftInfo(updatedAt) {
   var el = $('#pqDraftInfo'); if (!el) return;
   if (!updatedAt || !PQ.items.length) { el.classList.add('hidden'); el.textContent = ''; return; }
   var leftMin = Math.max(1, Math.ceil((updatedAt + PQ_TTL_MS - Date.now()) / 60000));
-  el.textContent = 'บันทึกคิวชั่วคราวอัตโนมัติ (กันไฟดับ) · เก็บไว้ 30 นาทีหลังรายการล่าสุด (เหลืออีก ' + leftMin + ' นาที)';
+  el.textContent = 'บันทึกคิวชั่วคราวอัตโนมัติ · เก็บไว้ 30 นาทีหลังรายการล่าสุด';
   el.classList.remove('hidden');
 }
 function pqRestoreDraft() {

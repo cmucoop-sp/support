@@ -526,3 +526,16 @@ td.act{white-space:nowrap;min-width:170px}
 
 .pq-draft-info{margin-top:6px;font-size:12.5px;color:var(--ok);font-weight:600}
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e11d48;color:#fff;font-size:11px;font-weight:700;margin-left:5px}
+
+/* ---------- Dropdown Accordion แท็บปริ้นรายงาน ---------- */
+.pq-acc{padding:0!important;overflow:hidden}
+.pq-acc-sum{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;user-select:none}
+.pq-acc-sum::-webkit-details-marker{display:none}
+.pq-acc-title{display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:var(--ink)}
+.pq-acc-title::before{content:'▸';font-size:14px;color:var(--accent-text);transition:transform .15s}
+.pq-acc[open]>.pq-acc-sum .pq-acc-title::before{content:'▾'}
+.pq-acc[open]>.pq-acc-sum{border-bottom:1px solid var(--line)}
+.pq-acc-body{padding:14px 16px}
+.pq-acc-sub{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#faf8ff;box-shadow:none!important}
+.pq-acc-sub .pq-acc-sum{padding:10px 14px}
+.pq-acc-sub .pq-acc-title{font-size:14.5px}
