@@ -1287,6 +1287,173 @@ if ($('#pqCode')) {
   });
 }
 
+/* ============================ ตรวจเช็ครายการซ้ำ ============================ */
+var DUP = { groups: [], sel: {}, rowsById: {} };
+function dupNormName(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
+function dupBuildGroups(rows) {
+  var n = rows.length, parent = new Int32Array(n), reasons = [];
+  for (var i = 0; i < n; i++) { parent[i] = i; reasons[i] = {}; }
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function union(a, b, why) {
+    reasons[a][why] = 1; reasons[b][why] = 1;
+    var ra = find(a), rb = find(b);
+    if (ra !== rb) parent[rb] = ra;
+  }
+  var byBar = {}, byName = {};
+  for (var i2 = 0; i2 < n; i2++) {
+    var v = rows[i2].v || [];
+    var pb = pqNormBar(v[5]), ub = pqNormBar(v[7]), nm = dupNormName(v[3]), cat = dupNormName(v[2]);
+    if (pb) {
+      if (byBar[pb] !== undefined) union(byBar[pb], i2, 'เลขบาร์ซ้ำ (' + pb + ')');
+      else byBar[pb] = i2;
+    }
+    if (ub) {
+      if (byBar[ub] !== undefined && byBar[ub] !== i2) union(byBar[ub], i2, 'เลขบาร์ซ้ำ (' + ub + ')');
+      else if (byBar[ub] === undefined) byBar[ub] = i2;
+    }
+    if (nm) {
+      var nk = cat + '|' + nm;
+      if (byName[nk] !== undefined) union(byName[nk], i2, 'ชื่อรายการซ้ำในหมวด');
+      else byName[nk] = i2;
+    }
+  }
+  var comp = {};
+  for (var k = 0; k < n; k++) {
+    var r = find(k);
+    (comp[r] || (comp[r] = [])).push(k);
+  }
+  var out = [];
+  Object.keys(comp).forEach(function (rKey) {
+    var idxs = comp[rKey];
+    if (idxs.length < 2) return;
+    var whySet = {};
+    idxs.forEach(function (ix) { Object.keys(reasons[ix]).forEach(function (w) { whySet[w] = 1; }); });
+    out.push({
+      reason: Object.keys(whySet).join(' · '),
+      rows: idxs.map(function (ix) { return rows[ix]; })
+    });
+  });
+  return out;
+}
+function dupUpdateDelBtn() {
+  var cnt = Object.keys(DUP.sel).filter(function (k) { return DUP.sel[k]; }).length;
+  var b = $('#bcDupDelSelBtn');
+  if (b) { b.textContent = 'ลบรายการที่เลือก (' + cnt + ')'; b.disabled = !cnt; }
+}
+function dupRender() {
+  var gs = DUP.groups, totalRows = gs.reduce(function (s, g) { return s + g.rows.length; }, 0);
+  $('#bcDupSummary').textContent = gs.length ? 'พบ ' + gs.length + ' กลุ่ม (' + totalRows + ' รายการ)' : 'ไม่พบรายการซ้ำในระบบ';
+  $('#bcDupList').innerHTML = gs.length ? gs.map(function (g, gi) {
+    var itemsHtml = g.rows.map(function (row) {
+      var v = row.v || [], id = String(row.r), checked = !!DUP.sel[id];
+      return '<div class="dup-row' + (checked ? ' is-del' : '') + '">' +
+        '<label class="dup-chk"><input type="checkbox" data-dup-chk="' + esc(id) + '"' + (checked ? ' checked' : '') + '/><span>' + (checked ? 'ลบ' : 'คงไว้') + '</span></label>' +
+        '<div class="dup-info"><b>' + esc(v[3]) + '</b>' +
+          '<div class="muted" style="font-size:12.5px">หมวด: ' + esc(v[2] || '-') + (v[1] ? ' · คู่ค้า: ' + esc(v[1]) : '') + (v[4] ? ' · ต่อแพ็ค: ' + esc(v[4]) : '') + '</div>' +
+          '<div class="bc" style="font-size:12.5px">' + (v[5] ? 'แพ็ค: ' + esc(v[5]) : '') + (v[5] && v[7] ? ' · ' : '') + (v[7] ? 'เดี่ยว: ' + esc(v[7]) : '') + '</div>' +
+        '</div>' +
+        '<div class="dup-acts">' +
+          '<button type="button" class="btn ghost small" data-dup-edit="' + esc(id) + '">แก้ไข</button>' +
+          '<button type="button" class="btn danger small" data-dup-del="' + esc(id) + '">ลบทันที</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="dup-group"><div class="dup-group-hd"><b>กลุ่มที่ ' + (gi + 1) + '</b> <span class="tag">' + esc(g.reason) + '</span></div>' + itemsHtml + '</div>';
+  }).join('') : '<div class="muted" style="text-align:center;padding:24px">ไม่พบรายการที่มีเลขบาร์หรือชื่อซ้ำกันในระบบ</div>';
+  dupUpdateDelBtn();
+}
+async function dupScan() {
+  $('#bcDupSummary').textContent = 'กำลังสแกนรายการทั้งหมด…';
+  $('#bcDupList').innerHTML = '<div class="muted" style="text-align:center;padding:24px">กำลังตรวจสอบ…</div>';
+  DUP.sel = {}; DUP.rowsById = {};
+  try {
+    var rows = await pqEnsureAll(true);
+    rows.forEach(function (r) { DUP.rowsById[String(r.r)] = r; });
+    DUP.groups = dupBuildGroups(rows);
+    dupRender();
+  } catch (e) {
+    $('#bcDupSummary').textContent = 'ตรวจสอบไม่สำเร็จ';
+    $('#bcDupList').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+if ($('#btnCheckDup')) {
+  $('#btnCheckDup').addEventListener('click', function () {
+    $('#bcDupModal').classList.remove('hidden');
+    dupScan();
+  });
+}
+if ($('#bcDupClose')) $('#bcDupClose').addEventListener('click', function () { $('#bcDupModal').classList.add('hidden'); });
+if ($('#bcDupReloadBtn')) $('#bcDupReloadBtn').addEventListener('click', dupScan);
+if ($('#bcDupAutoSelBtn')) {
+  $('#bcDupAutoSelBtn').addEventListener('click', function () {
+    DUP.sel = {};
+    DUP.groups.forEach(function (g) {
+      for (var i = 1; i < g.rows.length; i++) DUP.sel[String(g.rows[i].r)] = true;
+    });
+    dupRender();
+  });
+}
+if ($('#bcDupClearSelBtn')) {
+  $('#bcDupClearSelBtn').addEventListener('click', function () { DUP.sel = {}; dupRender(); });
+}
+if ($('#bcDupList')) {
+  $('#bcDupList').addEventListener('change', function (e) {
+    var cb = e.target.closest('input[data-dup-chk]'); if (!cb) return;
+    if (cb.checked) DUP.sel[cb.dataset.dupChk] = true; else delete DUP.sel[cb.dataset.dupChk];
+    dupRender();
+  });
+  $('#bcDupList').addEventListener('click', async function (e) {
+    var eb = e.target.closest('button[data-dup-edit]');
+    if (eb) {
+      var r = DUP.rowsById[eb.dataset.dupEdit]; if (!r) return;
+      var v = r.v || [];
+      var targetCat = S.cats.filter(function (c) { return c.cat === v[2]; })[0];
+      $('#bcDupModal').classList.add('hidden');
+      if (targetCat) await selectCat(targetCat.key);
+      var liveRow = (S.data && S.data.rows || []).find(function (x) { return String(x.r) === String(r.r); }) || r;
+      openEdit(liveRow);
+      return;
+    }
+    var db = e.target.closest('button[data-dup-del]');
+    if (db) {
+      var r2 = DUP.rowsById[db.dataset.dupDel]; if (!r2) return;
+      var v2 = r2.v || [];
+      if (!confirm('ลบรายการ "' + v2[3] + '" ออกจากระบบ?')) return;
+      db.disabled = true;
+      try {
+        await withSaving(call('deleteItem', PQ.sheet || 'บาร์สินค้า', r2.r, v2[3], r2.revision));
+        toast('ลบรายการแล้ว');
+        await refreshCats();
+        if (S.cur) await selectCat(S.cur);
+        await dupScan();
+      } catch (err) { toast(err.message, true); db.disabled = false; }
+    }
+  });
+}
+if ($('#bcDupDelSelBtn')) {
+  $('#bcDupDelSelBtn').addEventListener('click', async function () {
+    var ids = Object.keys(DUP.sel).filter(function (k) { return DUP.sel[k] && DUP.rowsById[k]; });
+    if (!ids.length) return;
+    if (!confirm('ยืนยันลบรายการที่เลือกทั้งหมด ' + ids.length + ' รายการ?')) return;
+    var btn = this; btn.disabled = true;
+    var ok = 0;
+    try {
+      for (var i = 0; i < ids.length; i++) {
+        var r = DUP.rowsById[ids[i]], v = r.v || [];
+        await call('deleteItem', PQ.sheet || 'บาร์สินค้า', r.r, v[3], r.revision);
+        ok++;
+      }
+      toast('ลบรายการซ้ำแล้ว ' + ok + ' รายการ');
+      await refreshCats();
+      if (S.cur) await selectCat(S.cur);
+      await dupScan();
+    } catch (err) {
+      toast('ลบสำเร็จ ' + ok + ' รายการ · เกิดข้อผิดพลาด: ' + err.message, true);
+      await dupScan();
+    }
+  });
+}
+
 /* ============================ นำเข้า / ส่งออก / สำเนา (รายการบาร์) ============================ */
 var BC_BK = [];
 function bcBkFmt(ts) { return new Date(ts).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' }); }

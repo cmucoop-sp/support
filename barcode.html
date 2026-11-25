@@ -15,7 +15,7 @@
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/shared/app.css?v=16.2" rel="stylesheet"/><link href="assets/css/shared/workspace-ui.css?v=16.2" rel="stylesheet"/><script src="assets/js/shared/workspace-ui.js?v=16.2" defer></script>
-<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.21">
+<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.23">
 <link rel="stylesheet" href="assets/css/shared/dashboard-v16.css?v=16.7">
 <script src="assets/js/shared/dashboard-v16.js?v=16.7" defer></script>
 <meta name="theme-color" content="#ede5fa">
@@ -48,6 +48,7 @@
         <button class="btn ghost small" id="btnNewCat" type="button">+ สร้างหมวดใหม่</button>
         <button class="btn ghost small hidden" id="btnEditCat" type="button">แก้ไขหมวด</button>
         <button class="btn danger small hidden" id="btnDelCat" type="button">ลบหมวด</button>
+        <button class="btn ghost small" id="btnCheckDup" type="button">ตรวจเช็ครายการซ้ำ</button>
       </div>
     </div>
     <div class="bc-cat-cur-meta">
@@ -340,6 +341,26 @@
 </section>
 </main>
 </div>
+<div class="modalwrap hidden" id="bcDupModal">
+<div class="modal" style="width:min(860px,100%)">
+  <div class="cardrow">
+    <h3 style="margin:0">ตรวจเช็ครายการซ้ำกันในระบบ</h3>
+    <span class="muted" id="bcDupSummary">กำลังตรวจสอบ…</span>
+  </div>
+  <div class="row" style="justify-content:space-between">
+    <div class="row">
+      <button class="btn ghost small" id="bcDupAutoSelBtn" type="button">เลือกลบตัวซ้ำอัตโนมัติ (คงไว้กลุ่มละ 1)</button>
+      <button class="btn ghost small" id="bcDupClearSelBtn" type="button">ล้างที่ติ๊ก</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="bcDupReloadBtn" type="button">สแกนใหม่</button>
+      <button class="btn danger small" id="bcDupDelSelBtn" type="button" disabled>ลบรายการที่เลือก (0)</button>
+    </div>
+  </div>
+  <div id="bcDupList" class="dup-list"></div>
+  <div class="addbar"><button class="btn ghost" id="bcDupClose" type="button">ปิด</button></div>
+</div>
+</div>
 <div class="modalwrap hidden" id="bcBkModal">
 <div class="modal" style="width:min(620px,100%)">
 <h3>สำเนาข้อมูลรายการบาร์ (เก็บล่าสุด 2 ชุด)</h3>
@@ -416,7 +437,7 @@
 <div id="printArea"></div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/barcode-export.js?v=16.4"></script>
-<script src="assets/js/pages/barcode.js?v=16.22"></script>
+<script src="assets/js/pages/barcode.js?v=16.23"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

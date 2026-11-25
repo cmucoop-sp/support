@@ -539,3 +539,16 @@ td.act{white-space:nowrap;min-width:170px}
 .pq-acc-sub{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#faf8ff;box-shadow:none!important}
 .pq-acc-sub .pq-acc-sum{padding:10px 14px}
 .pq-acc-sub .pq-acc-title{font-size:14.5px}
+
+/* ---------- ตรวจเช็ครายการซ้ำ ---------- */
+.dup-list{display:grid;gap:10px;max-height:58vh;overflow:auto}
+.dup-group{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.dup-group-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#faf7ff;border-bottom:1px solid var(--line)}
+.dup-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid #f0eaf8}
+.dup-row:last-child{border-bottom:0}
+.dup-row.is-del{background:#fff5f5}
+.dup-chk{display:inline-flex;align-items:center;gap:6px;flex-direction:row;min-width:82px;font-weight:700;color:var(--ink);cursor:pointer}
+.dup-chk input{width:auto}
+.dup-row.is-del .dup-chk{color:var(--bad)}
+.dup-info{flex:1 1 260px;min-width:0}
+.dup-acts{display:flex;gap:6px;flex:0 0 auto}
