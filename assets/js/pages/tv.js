@@ -209,8 +209,8 @@ function fitTvStage() {
   var baseW = Math.max(320, Number(c.width) || 760);
   var naturalH = measureStageHeight(c, 1);
   if (naturalH < 100) naturalH = 400;
-  var availW = Math.max(300, window.innerWidth - 36);
-  var availH = Math.max(300, window.innerHeight - 36);
+  var availW = Math.max(300, Math.min(window.innerWidth - 48, window.innerWidth * 0.90));
+  var availH = Math.max(300, Math.min(window.innerHeight - 48, window.innerHeight * 0.86));
   var scale = Math.max(0.4, Math.min(4.0, Math.min(availW / baseW, availH / naturalH)));
   applyMetrics(c, scale);
   var actualH = measureStageHeight(c, scale);

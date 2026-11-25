@@ -67,15 +67,17 @@ function applyPer() { layout(); }
 function layout() {
   var W = window.innerWidth || 800, H = window.innerHeight || 600;
   var availW = Math.max(80, W - 2 * M - 2 * PAD), sh = Math.max(60, (H - 2 * M - 2 * PAD - 12) * hPct / 100);
-  function widthFor(k) { return Math.max(40, Math.min((availW - (k - 1) * GAP) / k, sh * ar)); }
+  GAP = Math.max(14, Math.min(28, Math.round(availW * 0.022)));
+  var cardAr = Math.max(0.7, Math.min(1.15, ar || 0.75));
+  function widthFor(k) { return Math.max(40, Math.min((availW - (k - 1) * GAP) / k, sh * cardAr)); }
   var n = perSet, st = document.documentElement.style;
   if (!n) {
     var best = 0, lim = Math.max(1, Math.min(6, count || 6)); n = 1;
     for (var k = 1; k <= lim; k++) { var c = k * widthFor(k) * widthFor(k); if (c > best + 1) { best = c; n = k; } }
   }
   swPx = Math.floor(widthFor(n));
-  st.setProperty('--banner-frame-padding',Math.min(imageFramePadding,swPx/4,swPx/ar/4)+'px');
-  st.setProperty('--per', n); st.setProperty('--sw', swPx + 'px'); st.setProperty('--ar', String(ar)); st.setProperty('--gap', GAP + 'px');
+  st.setProperty('--banner-frame-padding',Math.min(imageFramePadding,swPx/4,swPx/cardAr/4)+'px');
+  st.setProperty('--per', n); st.setProperty('--sw', swPx + 'px'); st.setProperty('--ar', String(cardAr)); st.setProperty('--gap', GAP + 'px');
   $('#viewport').style.maxWidth = (n * swPx + (n - 1) * GAP) + 'px';
 }
 function perView() { return Number(getComputedStyle(document.documentElement).getPropertyValue('--per')) || 1; }
