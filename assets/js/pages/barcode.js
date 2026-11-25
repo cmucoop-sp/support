@@ -1288,7 +1288,24 @@ if ($('#pqCode')) {
 }
 
 /* ============================ ตรวจเช็ครายการซ้ำ ============================ */
+var DUP_KEEP_LS = 'cmucoop_bc_dup_kept';
 var DUP = { groups: [], sel: {}, kept: {}, rowsById: {} };
+function dupLoadLocalKept() {
+  try {
+    var raw = localStorage.getItem(DUP_KEEP_LS);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) { return {}; }
+}
+function dupSaveLocalKept() {
+  try { localStorage.setItem(DUP_KEEP_LS, JSON.stringify(DUP.kept || {})); } catch (_) {}
+}
+function dupPersistKept(showMsg) {
+  dupSaveLocalKept();
+  call('barcodeDupKeepSave', DUP.kept).then(function () {
+    if (showMsg) toast('บันทึกสถานะคงไว้แล้ว');
+  }).catch(function () {});
+}
 function dupNormName(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
 function dupBuildGroups(rows) {
   var n = rows.length, parent = new Int32Array(n), reasons = [];
@@ -1366,10 +1383,21 @@ function dupRender() {
 async function dupScan() {
   $('#bcDupSummary').textContent = 'กำลังสแกนรายการทั้งหมด…';
   $('#bcDupList').innerHTML = '<div class="muted" style="text-align:center;padding:24px">กำลังตรวจสอบ…</div>';
-  DUP.sel = {}; DUP.kept = {}; DUP.rowsById = {};
+  DUP.sel = {}; DUP.kept = dupLoadLocalKept(); DUP.rowsById = {};
   try {
-    var rows = await pqEnsureAll(true);
+    var res = await Promise.all([
+      pqEnsureAll(true),
+      call('barcodeDupKeepGet').catch(function () { return null; })
+    ]);
+    var rows = res[0] || [];
     rows.forEach(function (r) { DUP.rowsById[String(r.r)] = r; });
+    if (res[1] && res[1].kept && typeof res[1].kept === 'object') {
+      DUP.kept = res[1].kept;
+      dupSaveLocalKept();
+    }
+    Object.keys(DUP.kept).forEach(function (k) {
+      if (!DUP.rowsById[k]) delete DUP.kept[k];
+    });
     DUP.groups = dupBuildGroups(rows);
     dupRender();
   } catch (e) {
@@ -1392,16 +1420,17 @@ if ($('#bcDupAutoSelBtn')) {
       if (g.rows.length) DUP.kept[String(g.rows[0].r)] = true;
       for (var i = 1; i < g.rows.length; i++) DUP.sel[String(g.rows[i].r)] = true;
     });
+    dupPersistKept();
     dupRender();
   });
 }
 if ($('#bcDupClearSelBtn')) {
-  $('#bcDupClearSelBtn').addEventListener('click', function () { DUP.sel = {}; DUP.kept = {}; dupRender(); });
+  $('#bcDupClearSelBtn').addEventListener('click', function () { DUP.sel = {}; DUP.kept = {}; dupPersistKept(); dupRender(); });
 }
 if ($('#bcDupList')) {
   $('#bcDupList').addEventListener('change', function (e) {
     var cb = e.target.closest('input[data-dup-chk]'); if (!cb) return;
-    if (cb.checked) { DUP.sel[cb.dataset.dupChk] = true; delete DUP.kept[cb.dataset.dupChk]; }
+    if (cb.checked) { DUP.sel[cb.dataset.dupChk] = true; delete DUP.kept[cb.dataset.dupChk]; dupPersistKept(); }
     else delete DUP.sel[cb.dataset.dupChk];
     dupRender();
   });
@@ -1409,7 +1438,8 @@ if ($('#bcDupList')) {
     var kgb = e.target.closest('button[data-dup-keep-grp]');
     if (kgb) {
       var g = DUP.groups[Number(kgb.dataset.dupKeepGrp)]; if (!g) return;
-      g.rows.forEach(function (r) { var id = String(r.r); delete DUP.sel[id]; DUP.kept[id] = true; });
+      g.rows.forEach(function (r) { var id = String(r.r); delete DUP.sel[id]; DUP.kept[id] = { ts: Date.now(), by: (S.me && S.me.name) || '' }; });
+      dupPersistKept(true);
       dupRender();
       return;
     }
@@ -1417,7 +1447,8 @@ if ($('#bcDupList')) {
     if (kb) {
       var kid = kb.dataset.dupKeep;
       delete DUP.sel[kid];
-      if (DUP.kept[kid]) delete DUP.kept[kid]; else DUP.kept[kid] = true;
+      if (DUP.kept[kid]) delete DUP.kept[kid]; else DUP.kept[kid] = { ts: Date.now(), by: (S.me && S.me.name) || '' };
+      dupPersistKept(true);
       dupRender();
       return;
     }
