@@ -15,7 +15,7 @@
 <script src="assets/vendor/xlsx.full.min.js"></script>
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link href="assets/css/shared/app.css?v=16.2" rel="stylesheet"/><link href="assets/css/shared/workspace-ui.css?v=16.2" rel="stylesheet"/><script src="assets/js/shared/workspace-ui.js?v=16.2" defer></script>
-<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.15">
+<link rel="stylesheet" href="assets/css/pages/barcode.css?v=16.19">
 <link rel="stylesheet" href="assets/css/shared/dashboard-v16.css?v=16.7">
 <script src="assets/js/shared/dashboard-v16.js?v=16.7" defer></script>
 <meta name="theme-color" content="#ede5fa">
@@ -33,7 +33,7 @@
 <div class="layout single">
 <main id="wcag-main"><div class="workspace-intro"><div><span class="workspace-eyebrow">CMUCOOP WORKSPACE</span><h2>จัดการบาร์เดี่ยว / บาร์แพ็ค</h2><p>ค้นหารายการ เลือกหมวด จับคู่บาร์เดี่ยว/บาร์แพ็คจากชื่อที่คล้ายกัน หรือจัดพิมพ์รายงาน</p></div></div><div class="workspace-stats barcode-stats" id="barcodeStats" aria-label="สรุปรายการบาร์โค้ด"></div>
 <nav class="tabs">
-<button class="tab on" data-t="data">รายการสินค้า</button><button class="tab" data-t="manage">เพิ่มและนำเข้า</button><button class="tab" data-t="pair">จับคู่บาร์เดี่ยว/แพ็ค</button>
+<button class="tab on" data-t="data">รายการสินค้า</button><button class="tab" data-t="manage">เพิ่มและนำเข้า <span class="tab-badge hidden" id="bcTempBadge">0</span></button><button class="tab" data-t="pair">จับคู่บาร์เดี่ยว/แพ็ค</button>
 <button class="tab" data-t="print">ปริ้นรายงาน</button>
 </nav>
 <!-- ========== แท็บข้อมูล ========== -->
@@ -78,7 +78,21 @@
 </nav>
 <div class="muted" style="margin-top:6px">ปุ่ม "แก้ไข" แก้ข้อมูลรายการ และปุ่ม "ลบ" ลบรายการออกจากชีต (ระบบบันทึกประวัติไว้ทุกครั้ง) ส่วนช่องจำนวนในระบบ / กระจาย / ของเดิม ไม่ต้องกรอกในระบบ เว้นไว้ให้เขียนบนกระดาษที่ปริ้น</div>
 </div></section>
-<section class="workspace-pane hidden" id="v-manage"><div class="workspace-section-title"><h3>เพิ่มรายการและจัดการไฟล์</h3><p>กรอกสินค้าใหม่ หรือนำเข้า Excel พร้อมสำรองข้อมูลเดิม</p></div><div class="card">
+<section class="workspace-pane hidden" id="v-manage"><div class="workspace-section-title"><h3>เพิ่มรายการและจัดการไฟล์</h3><p>กรอกสินค้าใหม่ ตรวจสอบรายการชั่วคราวที่พนักงานส่งมา หรือนำเข้า Excel พร้อมสำรองข้อมูลเดิม</p></div>
+<div class="card hidden" id="bcTempAdminCard" style="border:1.5px solid #ccb6f1;background:#fcfaff">
+  <div class="cardrow">
+    <h3 style="margin:0">รายการชั่วคราวรอ Admin ตรวจสอบ <span class="tag" id="bcTempAdminCount">0</span></h3>
+    <button class="btn ghost small" id="bcTempReloadBtn" type="button">โหลดรายการล่าสุด</button>
+  </div>
+  <div class="muted" style="margin-bottom:8px">รายการที่พนักงานเพิ่มชั่วคราวตอนปริ้น · สามารถแก้ไขข้อมูลให้ถูกต้องก่อนกด <b>บันทึกเข้าระบบ</b> หรือ <b>ลบ</b> ได้</div>
+  <div class="tablewrap" style="max-height:40vh">
+    <table class="logt">
+      <thead><tr><th>ผู้ส่ง / เวลา</th><th>หมวด / คู่ค้า</th><th>ชื่อรายการ</th><th>บาร์แพ็ค / บาร์เดี่ยว</th><th>กระจาย</th><th>จัดการ</th></tr></thead>
+      <tbody id="bcTempAdminTbody"></tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
 <h3>เพิ่มรายการ</h3>
 <div class="grid" id="addForm"></div>
 <div aria-live="polite" class="bchint" id="addBc"></div>
@@ -237,7 +251,9 @@
       <input id="pqSpread" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 5"/>
     </label>
     <button class="btn" id="pqAddBtn" type="button" style="align-self:end">+ เพิ่มรายการ</button>
+    <button class="btn ghost" id="pqTempBtn" type="button" style="align-self:end">+ เพิ่มรายการที่ไม่มีชั่วคราว</button>
   </div>
+  <div class="pq-draft-info muted hidden" id="pqDraftInfo" aria-live="polite"></div>
   <div class="pq-picked muted" id="pqPicked" aria-live="polite"></div>
   <div class="pq-matches hidden" id="pqMatches"></div>
   <div class="tablewrap pq-tablewrap hidden" id="pqTableWrap">
@@ -307,6 +323,29 @@
 </div>
 </div>
 </div>
+<div class="modalwrap hidden" id="pqTempModal">
+<div class="modal" style="width:min(580px,100%)">
+  <h3 id="pqtTitle">เพิ่มรายการที่ไม่มีชั่วคราว</h3>
+  <div class="muted" id="pqtDesc">ใช้สำหรับปริ้นทันทีเมื่อยังไม่มีสินค้านี้ในระบบ · ข้อมูลจะถูกส่งให้ Admin ตรวจสอบและบันทึกเข้าระบบถาวร</div>
+  <div class="grid">
+    <label>รหัสคู่ค้า<input id="pqtPartner" type="text" autocomplete="off" placeholder="ไม่บังคับ"/></label>
+    <label>หมวด<input id="pqtCat" type="text" list="dlCats" autocomplete="off" placeholder="เลือกหรือพิมพ์หมวด"/></label>
+    <label class="wide">ชื่อรายการ <span style="color:var(--bad)">*</span><input id="pqtName" type="text" autocomplete="off" placeholder="ระบุชื่อสินค้า"/></label>
+    <label>จำนวนต่อแพ็ค<input id="pqtPerPack" type="text" autocomplete="off" placeholder="เช่น 12"/></label>
+    <label>จำนวน (ช่องกระจาย)<input id="pqtSpread" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 5"/></label>
+    <label>เลขบาร์แพ็ค<input id="pqtPackBar" type="text" autocomplete="off" placeholder="เลขบาร์แพ็ค"/></label>
+    <label>เลขบาร์เดี่ยว<input id="pqtUnitBar" type="text" autocomplete="off" placeholder="เลขบาร์เดี่ยว"/></label>
+  </div>
+  <label id="pqtSendWrap" style="display:flex;align-items:center;gap:8px;flex-direction:row;color:var(--ink);font-size:14px">
+    <input id="pqtSendAdmin" type="checkbox" checked style="width:auto"/> ส่งข้อมูลรายการนี้ให้ Admin ตรวจสอบก่อนบันทึกเข้าระบบ
+  </label>
+  <div class="err" id="pqtErr" role="alert"></div>
+  <div class="addbar">
+    <button class="btn" id="pqtSave" type="button">เพิ่มเข้ารายการปริ้น</button>
+    <button class="btn ghost" id="pqtCancel" type="button">ยกเลิก</button>
+  </div>
+</div>
+</div>
 <div class="modalwrap hidden" id="editModal">
 <div class="modal">
 <h3 id="eTitle">แก้ไขรายการ</h3>
@@ -334,7 +373,7 @@
 <div id="printArea"></div>
 <div id="toast" role="status"></div>
 <script src="assets/js/pages/barcode-export.js?v=16.4"></script>
-<script src="assets/js/pages/barcode.js?v=16.15"></script>
+<script src="assets/js/pages/barcode.js?v=16.19"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

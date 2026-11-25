@@ -872,7 +872,8 @@ $('#btnPrintOld').addEventListener('click', async function () {
 });
 
 /* ============================ ปริ้นเฉพาะรายการ (กรอกบาร์โค้ด + ช่องกระจาย) ============================ */
-var PQ = { all: null, header: null, sheet: '', loading: null, picked: null, items: [] };
+var PQ = { all: null, header: null, sheet: '', loading: null, picked: null, items: [], draftTimer: null, editTemp: null, tempList: [] };
+var PQ_TTL_MS = 30 * 60 * 1000;
 function pqNormBar(s) { return String(s == null ? '' : s).replace(/[\s'"]+/g, '').replace(/[pP]/g, '').toLowerCase(); }
 async function pqEnsureAll(force) {
   if (!force && PQ.all) return PQ.all;
@@ -940,7 +941,45 @@ function pqRenderMatches(list) {
   box._list = list;
   box.classList.remove('hidden');
 }
-function pqRenderQueue() {
+function pqDraftKey() { return S.me && S.me.user ? 'cmucoop_bc_pq:' + encodeURIComponent(S.me.user) : ''; }
+function pqSaveDraft() {
+  var k = pqDraftKey(); if (!k) return;
+  try {
+    if (!PQ.items.length) { localStorage.removeItem(k); pqUpdateDraftInfo(0); return; }
+    var ts = Date.now();
+    var payload = {
+      updatedAt: ts,
+      items: PQ.items.map(function (it) { return { row: it.row, spread: it.spread, isTemp: !!it.isTemp }; })
+    };
+    localStorage.setItem(k, JSON.stringify(payload));
+    pqUpdateDraftInfo(ts);
+  } catch (e) {}
+}
+function pqUpdateDraftInfo(updatedAt) {
+  var el = $('#pqDraftInfo'); if (!el) return;
+  if (!updatedAt || !PQ.items.length) { el.classList.add('hidden'); el.textContent = ''; return; }
+  var leftMin = Math.max(1, Math.ceil((updatedAt + PQ_TTL_MS - Date.now()) / 60000));
+  el.textContent = 'บันทึกคิวชั่วคราวอัตโนมัติ (กันไฟดับ) · เก็บไว้ 30 นาทีหลังรายการล่าสุด (เหลืออีก ' + leftMin + ' นาที)';
+  el.classList.remove('hidden');
+}
+function pqRestoreDraft() {
+  var k = pqDraftKey(); if (!k) return;
+  try {
+    var raw = localStorage.getItem(k);
+    if (!raw) { pqUpdateDraftInfo(0); return; }
+    var d = JSON.parse(raw);
+    if (!d || !d.updatedAt || (Date.now() - Number(d.updatedAt)) > PQ_TTL_MS || !Array.isArray(d.items) || !d.items.length) {
+      localStorage.removeItem(k); pqUpdateDraftInfo(0); return;
+    }
+    PQ.items = d.items.filter(function (x) { return x && x.row && Array.isArray(x.row.v); }).map(function (x) {
+      return { row: x.row, spread: String(x.spread == null ? '' : x.spread), isTemp: !!x.isTemp };
+    });
+    pqRenderQueue(true);
+    pqUpdateDraftInfo(Number(d.updatedAt));
+    if (PQ.items.length) toast('กู้คืนรายการคิวปริ้นที่ทำค้างไว้ ' + PQ.items.length + ' รายการ (บันทึกไว้ 30 นาที)');
+  } catch (e) {}
+}
+function pqRenderQueue(skipSave) {
   var n = PQ.items.length;
   $('#pqCount').textContent = n ? 'เตรียมปริ้น ' + n + ' รายการ' : 'ยังไม่มีรายการที่เตรียมปริ้น';
   $('#pqTableWrap').classList.toggle('hidden', !n);
@@ -949,15 +988,17 @@ function pqRenderQueue() {
   $('#pqClearBtn').disabled = !n;
   $('#pqTbody').innerHTML = PQ.items.map(function (it, idx) {
     var v = it.row.v || [];
+    var tempBadge = it.isTemp ? ' <span class="tag">ชั่วคราว</span>' : '';
     return '<tr>' +
       '<td style="text-align:center">' + (idx + 1) + '</td>' +
       '<td>' + esc(v[2] || '-') + (v[1] ? '<div class="muted" style="font-size:12px">' + esc(v[1]) + '</div>' : '') + '</td>' +
-      '<td><b>' + esc(v[3]) + '</b>' + (v[4] ? '<div class="muted" style="font-size:12px">ต่อแพ็ค: ' + esc(v[4]) + '</div>' : '') + '</td>' +
+      '<td><b>' + esc(v[3]) + '</b>' + tempBadge + (v[4] ? '<div class="muted" style="font-size:12px">ต่อแพ็ค: ' + esc(v[4]) + '</div>' : '') + '</td>' +
       '<td class="bc">' + (v[5] ? 'แพ็ค: ' + esc(v[5]) : '') + (v[5] && v[7] ? '<br>' : '') + (v[7] ? 'เดี่ยว: ' + esc(v[7]) : '') + '</td>' +
       '<td><input type="text" class="pq-spread-inp" data-pq-idx="' + idx + '" value="' + esc(it.spread) + '" inputmode="decimal" aria-label="จำนวนกระจาย"/></td>' +
       '<td style="text-align:center"><button type="button" class="btn danger small" data-pq-del="' + idx + '" aria-label="ลบรายการ">ลบ</button></td>' +
     '</tr>';
   }).join('');
+  if (!skipSave) pqSaveDraft();
 }
 function pqAddItem(row, spreadRaw) {
   if (!row) return;
@@ -975,7 +1016,7 @@ function pqAddItem(row, spreadRaw) {
       toast('รายการนี้อยู่ในคิวปริ้นแล้ว (แก้จำนวนในตารางได้)');
     }
   } else {
-    PQ.items.push({ row: row, spread: sp });
+    PQ.items.push({ row: row, spread: sp, isTemp: !!row._isTemp });
   }
   PQ.picked = null;
   $('#pqCode').value = '';
@@ -1014,7 +1055,7 @@ if ($('#pqCode')) {
         var res = pqFindMatches($('#pqCode').value.trim());
         if (res.exact) { pqSetPicked(res.exact); pqRenderMatches([]); }
         else if (res.list.length) { pqSetPicked(null); pqRenderMatches(res.list); }
-        else { $('#pqPicked').textContent = 'ไม่พบสินค้าที่ตรงกับ "' + $('#pqCode').value.trim() + '"'; pqRenderMatches([]); }
+        else { $('#pqPicked').innerHTML = 'ไม่พบสินค้าที่ตรงกับ "' + esc($('#pqCode').value.trim()) + '" <button type="button" class="btn ghost small" id="pqNotFoundTemp" style="margin-left:6px">+ เพิ่มรายการนี้ชั่วคราว</button>'; pqRenderMatches([]); }
       } catch (e) { toast(e.message, true); }
     }, 150);
   });
@@ -1067,7 +1108,11 @@ if ($('#pqCode')) {
   $('#pqTbody').addEventListener('input', function (e) {
     var inp = e.target.closest('.pq-spread-inp'); if (!inp) return;
     var idx = Number(inp.dataset.pqIdx);
-    if (PQ.items[idx]) PQ.items[idx].spread = inp.value;
+    if (PQ.items[idx]) {
+      PQ.items[idx].spread = inp.value;
+      clearTimeout(PQ.draftTimer);
+      PQ.draftTimer = setTimeout(pqSaveDraft, 250);
+    }
   });
   $('#pqTbody').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-pq-del]'); if (!b) return;
@@ -1080,6 +1125,94 @@ if ($('#pqCode')) {
     PQ.items = [];
     pqRenderQueue();
     $('#pqCode').focus();
+  });
+  function pqOpenTempModal(adminItem) {
+    PQ.editTemp = adminItem || null;
+    $('#pqtErr').textContent = '';
+    if (adminItem) {
+      $('#pqtTitle').textContent = 'แก้ไขรายการชั่วคราวก่อนบันทึกเข้าระบบ';
+      $('#pqtDesc').textContent = 'ส่งโดย ' + (adminItem.by || '-') + ' · ตรวจสอบและแก้ไขให้ถูกต้อง แล้วกดบันทึกเข้าระบบจริง';
+      $('#pqtPartner').value = adminItem.partner || '';
+      $('#pqtCat').value = adminItem.cat || '';
+      $('#pqtName').value = adminItem.name || '';
+      $('#pqtPerPack').value = adminItem.perPack || '';
+      $('#pqtPackBar').value = adminItem.packBar || '';
+      $('#pqtUnitBar').value = adminItem.unitBar || '';
+      $('#pqtSpread').value = adminItem.spread || '';
+      $('#pqtSendWrap').classList.add('hidden');
+      $('#pqtSave').textContent = 'บันทึกเข้าระบบ';
+    } else {
+      var q = $('#pqCode').value.trim(), isCode = /^[pP]?\d{4,64}$/.test(q);
+      $('#pqtTitle').textContent = 'เพิ่มรายการที่ไม่มีชั่วคราว';
+      $('#pqtDesc').textContent = 'ใช้สำหรับปริ้นทันทีเมื่อยังไม่มีสินค้านี้ในระบบ · ข้อมูลจะถูกส่งให้ Admin ตรวจสอบและบันทึกเข้าระบบถาวร';
+      $('#pqtPartner').value = '';
+      $('#pqtCat').value = '';
+      $('#pqtName').value = isCode ? '' : q;
+      $('#pqtPerPack').value = '';
+      $('#pqtPackBar').value = '';
+      $('#pqtUnitBar').value = isCode ? q.replace(/[pP]/g, '') : '';
+      $('#pqtSpread').value = $('#pqSpread').value.trim();
+      $('#pqtSendAdmin').checked = true;
+      $('#pqtSendWrap').classList.remove('hidden');
+      $('#pqtSave').textContent = 'เพิ่มเข้ารายการปริ้น';
+    }
+    $('#pqTempModal').classList.remove('hidden');
+    (adminItem || $('#pqtName').value ? $('#pqtName') : ($('#pqtUnitBar').value ? $('#pqtName') : $('#pqtName'))).focus();
+  }
+  $('#pqTempBtn').addEventListener('click', function () { pqOpenTempModal(null); });
+  $('#pqPicked').addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'pqNotFoundTemp') pqOpenTempModal(null);
+  });
+  $('#pqtCancel').addEventListener('click', function () { $('#pqTempModal').classList.add('hidden'); });
+  $('#pqtSave').addEventListener('click', async function () {
+    $('#pqtErr').textContent = '';
+    var item = {
+      partner: $('#pqtPartner').value.trim(),
+      cat: $('#pqtCat').value.trim(),
+      name: $('#pqtName').value.trim(),
+      perPack: $('#pqtPerPack').value.trim(),
+      packBar: $('#pqtPackBar').value.replace(/[\s'"]+/g, '').replace(/[pP]/g, ''),
+      unitBar: $('#pqtUnitBar').value.replace(/[\s'"]+/g, '').replace(/[pP]/g, ''),
+      spread: $('#pqtSpread').value.trim()
+    };
+    if (!item.name) { $('#pqtErr').textContent = 'กรุณากรอกชื่อรายการ'; $('#pqtName').focus(); return; }
+    if (!item.packBar && !item.unitBar) { $('#pqtErr').textContent = 'กรุณากรอกเลขบาร์แพ็คหรือเลขบาร์เดี่ยวอย่างน้อย 1 ช่อง'; $('#pqtUnitBar').focus(); return; }
+    if (PQ.editTemp) {
+      var cur = PQ.editTemp;
+      await busy(this, async function () {
+        var r = await call('barcodeTempDecide', cur.id, 'approve', item, false);
+        if (r.duplicate) {
+          if (!confirm(r.message + '\n\nต้องการบันทึกซ้ำเข้าระบบหรือไม่?')) return;
+          r = await call('barcodeTempDecide', cur.id, 'approve', item, true);
+        }
+        $('#pqTempModal').classList.add('hidden');
+        PQ.tempList = r.items || [];
+        renderTempAdmin();
+        PQ.all = null;
+        await refreshCats();
+        toast('อนุมัติและบันทึกเข้าระบบแล้ว');
+      });
+      return;
+    }
+    var tempRow = {
+      r: 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      _isTemp: true,
+      v: [0, item.partner, item.cat || 'รายการชั่วคราว', item.name, item.perPack, item.packBar, '', item.unitBar, '', item.spread, '']
+    };
+    pqAddItem(tempRow, item.spread);
+    var sendAdmin = $('#pqtSendAdmin').checked;
+    $('#pqTempModal').classList.add('hidden');
+    if (sendAdmin) {
+      try {
+        await call('barcodeTempSubmit', item);
+        toast('เพิ่มในคิวปริ้นและส่งให้ Admin ตรวจสอบแล้ว');
+        if (S.me && S.me.role === 'admin') loadTempAdmin();
+      } catch (err) {
+        toast('เพิ่มในคิวปริ้นแล้ว (ส่งถึง Admin ไม่สำเร็จ: ' + err.message + ')', true);
+      }
+    } else {
+      toast('เพิ่มรายการชั่วคราวในคิวปริ้นแล้ว');
+    }
   });
   $('#pqPrintBtn').addEventListener('click', async function () {
     if (!PQ.items.length) { toast('เพิ่มรายการก่อนปริ้น', true); return; }
@@ -2544,6 +2677,76 @@ if (typeof window !== "undefined") {
   });
 }
 
+/* ============================ คิวรายการชั่วคราวสำหรับ Admin ============================ */
+function renderTempAdmin() {
+  var list = PQ.tempList || [], n = list.length;
+  if ($('#bcTempBadge')) {
+    $('#bcTempBadge').textContent = String(n);
+    $('#bcTempBadge').classList.toggle('hidden', !n);
+  }
+  if ($('#bcTempAdminCount')) $('#bcTempAdminCount').textContent = String(n);
+  if ($('#bcTempAdminCard')) $('#bcTempAdminCard').classList.toggle('hidden', !n);
+  if (!$('#bcTempAdminTbody')) return;
+  $('#bcTempAdminTbody').innerHTML = list.map(function (x) {
+    return '<tr>' +
+      '<td><b>' + esc(x.by || '-') + '</b><div class="muted" style="font-size:12px">' + (x.ts ? fmt(x.ts) : '') + '</div></td>' +
+      '<td>' + esc(x.cat || 'ไม่ระบุหมวด') + (x.partner ? '<div class="muted" style="font-size:12px">' + esc(x.partner) + '</div>' : '') + '</td>' +
+      '<td><b>' + esc(x.name) + '</b>' + (x.perPack ? '<div class="muted" style="font-size:12px">ต่อแพ็ค: ' + esc(x.perPack) + '</div>' : '') + '</td>' +
+      '<td class="bc">' + (x.packBar ? 'แพ็ค: ' + esc(x.packBar) : '') + (x.packBar && x.unitBar ? '<br>' : '') + (x.unitBar ? 'เดี่ยว: ' + esc(x.unitBar) : '') + '</td>' +
+      '<td style="text-align:center">' + esc(x.spread || '-') + '</td>' +
+      '<td class="act"><div class="actw">' +
+        '<button type="button" class="btn ghost small" data-tact="edit" data-tid="' + esc(x.id) + '">แก้ไขก่อนบันทึก</button>' +
+        '<button type="button" class="btn small" data-tact="approve" data-tid="' + esc(x.id) + '">บันทึกเข้าระบบ</button>' +
+        '<button type="button" class="btn danger small" data-tact="reject" data-tid="' + esc(x.id) + '">ลบ</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+async function loadTempAdmin() {
+  if (!S.me || S.me.role !== 'admin') return;
+  try {
+    var r = await call('barcodeTempList');
+    PQ.tempList = Array.isArray(r.items) ? r.items : [];
+    renderTempAdmin();
+  } catch (e) {}
+}
+if ($('#bcTempReloadBtn')) $('#bcTempReloadBtn').addEventListener('click', loadTempAdmin);
+if ($('#bcTempAdminTbody')) {
+  $('#bcTempAdminTbody').addEventListener('click', async function (e) {
+    var b = e.target.closest('button[data-tact]'); if (!b) return;
+    var item = (PQ.tempList || []).find(function (x) { return x.id === b.dataset.tid; }); if (!item) return;
+    var act = b.dataset.tact;
+    if (act === 'edit') {
+      if (typeof pqOpenTempModal === 'function') pqOpenTempModal(item);
+      return;
+    }
+    if (act === 'reject') {
+      if (!confirm('ลบรายการชั่วคราว "' + item.name + '"?')) return;
+      b.disabled = true;
+      try { var r = await call('barcodeTempDecide', item.id, 'reject'); PQ.tempList = r.items || []; renderTempAdmin(); toast('ลบรายการชั่วคราวแล้ว'); }
+      catch (err) { toast(err.message, true); }
+      b.disabled = false;
+      return;
+    }
+    if (act === 'approve') {
+      b.disabled = true;
+      try {
+        var r2 = await call('barcodeTempDecide', item.id, 'approve', item, false);
+        if (r2.duplicate) {
+          if (!confirm(r2.message + '\n\nต้องการบันทึกซ้ำเข้าระบบหรือไม่?')) { b.disabled = false; return; }
+          r2 = await call('barcodeTempDecide', item.id, 'approve', item, true);
+        }
+        PQ.tempList = r2.items || [];
+        renderTempAdmin();
+        PQ.all = null;
+        await refreshCats();
+        toast('อนุมัติและบันทึก "' + item.name + '" เข้าระบบแล้ว');
+      } catch (err) { toast(err.message, true); }
+      b.disabled = false;
+    }
+  });
+}
+
 /* ============================ ประวัติ / แท็บ ============================ */
 function switchTab(t) {
   if (S.me && S.me.role !== "admin" && t !== "print") t = "print";
@@ -2569,7 +2772,7 @@ function showLogin(msg) {
   document.querySelectorAll(".modalwrap,.overlay").forEach(function (dialog) { dialog.classList.add("hidden"); });
   if ($("#login")) $("#login").classList.remove("hidden");
   $("#lgErr").textContent = msg || ""; $("#lgPass").value = "";
-  $("#tbody").innerHTML = ""; $("#pList").innerHTML = ""; $("#catSide").innerHTML = ""; PQ.all = null; PQ.picked = null; PQ.items = []; if ($("#pqTbody")) pqRenderQueue();
+  $("#tbody").innerHTML = ""; $("#pList").innerHTML = ""; $("#catSide").innerHTML = ""; PQ.all = null; PQ.picked = null; PQ.items = []; PQ.tempList = []; if ($("#pqTbody")) pqRenderQueue(true); if ($("#bcTempBadge")) $("#bcTempBadge").classList.add("hidden");
   setTimeout(function () { $("#lgUser").focus(); }, 50);
 }
 function hasPerm(k) { return !!(S.me && (S.me.role === "admin" || (S.me.perms && S.me.perms[k]))); }
@@ -2586,9 +2789,11 @@ async function openBarcode() {
   $(".layout").classList.add("single");
   if ($("#bcCatBarCard")) $("#bcCatBarCard").classList.toggle("hidden", !admin);
   switchTab(admin ? "data" : "print");
+  pqRestoreDraft();
   if (admin) {
     bcLoadBk();
     initPairContextAndRestoreDraft();
+    loadTempAdmin();
   }
   try {
     await refreshCats();
