@@ -7,7 +7,11 @@
   body { background:var(--bg); color:var(--tv-fg); font-family:var(--font),'Sarabun','Noto Sans Thai',Tahoma,sans-serif; min-height:100vh;
          padding:max(var(--pad-top),env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom)); }
   .wrap { max-width:var(--w); margin:0 auto; display:flex; flex-direction:column; gap:0; }
+  .tv-stage { display:flex; flex-direction:column; justify-content:center; align-items:stretch; width:100%; }
+  body:not(.tv-preview-mode).tv-autofit { padding-top:0; }
+  body:not(.tv-preview-mode).tv-autofit .tv-stage { min-height:100vh; min-height:100dvh; padding:max(14px,env(safe-area-inset-top)) 0 max(14px,env(safe-area-inset-bottom)); }
   .wrap > * + * { margin-top:var(--gap); }
+  .tv-stage > * + * { margin-top:var(--gap); }
   #banner { margin-top:var(--g-banner,var(--gap)); } #caption { margin-top:var(--g-caption,var(--gap)); }
   #receiver { margin-top:var(--g-receiver,var(--gap)); } .foot { margin-top:var(--g-foot,var(--gap)); }
 

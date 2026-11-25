@@ -1,4 +1,6 @@
 var TV_PREVIEW_MODE = new URLSearchParams(location.search).get('preview') === '1';
+var TV_AUTOFIT = !TV_PREVIEW_MODE && new URLSearchParams(location.search).get('autofit') !== '0';
+if (TV_AUTOFIT) document.body.classList.add('tv-autofit');
 var TV_LAST_BG = '#eee5f8';
 var TV_LAST_CFG = {};
 if (TV_PREVIEW_MODE) {
@@ -147,31 +149,77 @@ function applyCfg(c) {
     var v = String(c[p[0]] || '');
     if (/^#[0-9a-f]{6}$/i.test(v)) r.setProperty(p[1], v); else r.removeProperty(p[1]);
   });
-  if (c.width) r.setProperty('--w', c.width + 'px');
-  if (c.bannerH) r.setProperty('--banner-h', c.bannerH + 'px');
-  if (c.receiverH) r.setProperty('--receiver-h', c.receiverH + 'px');
-  [['fontClock','--f-clock'],['fontShop','--f-shop'],['fontHello','--f-hello'],['fontCaption','--f-caption']].forEach(function (p) {
-    if (c[p[0]]) r.setProperty(p[1], c[p[0]] + 'px');
-  });
-  if (c.gap !== undefined && c.gap !== null) r.setProperty('--gap', c.gap + 'px');
-  r.setProperty('--banner-w', Number(c.bannerW) > 0 ? c.bannerW + 'px' : '100%');
-  r.setProperty('--receiver-w', Number(c.receiverW) > 0 ? c.receiverW + 'px' : '100%');
-  if (c.padTop !== undefined && c.padTop !== null) r.setProperty('--pad-top', c.padTop + 'px');
-  if (c.logoSize) r.setProperty('--logo', c.logoSize + 'px');
-  if (c.headGap !== undefined && c.headGap !== null) r.setProperty('--head-gap', c.headGap + 'px');
-  [['gapBanner','--g-banner'],['gapCaption','--g-caption'],['gapReceiver','--g-receiver'],['gapFoot','--g-foot']].forEach(function (p) {
-    var v = c[p[0]]; if (v === null || v === undefined || v === '') r.removeProperty(p[1]); else r.setProperty(p[1], v + 'px');
-  });
+  applyMetrics(c, 1);
   useFont(c.font);
   $('head').setAttribute('data-layout', c.headLayout || 'side');
   if (c.capSpeed) capSpeed = Number(c.capSpeed) || 80;
-  layoutCaption();
   $('logo').style.display = c.showLogo === false ? 'none' : '';
   $('clock').style.display = c.showClock === false ? 'none' : '';
   $('banner').style.display = c.showBanner === false ? 'none' : '';
   $('receiverPreview').style.marginTop = (c.gapReceiver === null || c.gapReceiver === undefined || c.gapReceiver === '' ? (c.gap === undefined ? 14 : c.gap) : c.gapReceiver) + 'px';
+  if (TV_AUTOFIT) fitTvStage();
+  else layoutCaption();
   tvSyncBannerTheme();
 }
+function applyMetrics(c, scale) {
+  c = c || {};
+  var s = scale > 0 ? scale : 1;
+  var r = document.documentElement.style;
+  var sc = function (v, def) {
+    var n = (v === undefined || v === null || v === '') ? def : Number(v);
+    return (Math.round(n * s * 100) / 100) + 'px';
+  };
+  r.setProperty('--w', sc(c.width, 760));
+  r.setProperty('--banner-h', sc(c.bannerH, 230));
+  if (c.receiverH) r.setProperty('--receiver-h', c.receiverH + 'px');
+  r.setProperty('--f-clock', sc(c.fontClock, 22));
+  r.setProperty('--f-shop', sc(c.fontShop, 22));
+  r.setProperty('--f-hello', sc(c.fontHello, 22));
+  r.setProperty('--f-caption', sc(c.fontCaption, 22));
+  r.setProperty('--gap', sc(c.gap, 14));
+  r.setProperty('--banner-w', Number(c.bannerW) > 0 ? sc(c.bannerW, 0) : '100%');
+  r.setProperty('--receiver-w', Number(c.receiverW) > 0 ? c.receiverW + 'px' : '100%');
+  r.setProperty('--pad-top', sc(c.padTop, 14));
+  r.setProperty('--logo', sc(c.logoSize, 84));
+  r.setProperty('--head-gap', sc(c.headGap, 18));
+  [['gapBanner','--g-banner'],['gapCaption','--g-caption']].forEach(function (p) {
+    var v = c[p[0]]; if (v === null || v === undefined || v === '') r.removeProperty(p[1]); else r.setProperty(p[1], sc(v, 0));
+  });
+  [['gapReceiver','--g-receiver'],['gapFoot','--g-foot']].forEach(function (p) {
+    var v = c[p[0]]; if (v === null || v === undefined || v === '') r.removeProperty(p[1]); else r.setProperty(p[1], v + 'px');
+  });
+}
+var tvFitRaf = 0;
+function fitTvStage() {
+  if (!TV_AUTOFIT) { layoutCaption(); return; }
+  var c = TV_LAST_CFG || {};
+  applyMetrics(c, 1);
+  var head = $('head'), banner = $('banner'), cap = $('caption');
+  var baseW = Math.max(320, Number(c.width) || 760);
+  var baseGap = (c.gap === undefined || c.gap === null) ? 14 : Number(c.gap);
+  var gBanner = (c.gapBanner === null || c.gapBanner === undefined || c.gapBanner === '') ? baseGap : Number(c.gapBanner);
+  var gCaption = (c.gapCaption === null || c.gapCaption === undefined || c.gapCaption === '') ? baseGap : Number(c.gapCaption);
+  var headH = head ? head.getBoundingClientRect().height : 0;
+  var bannerVis = banner && banner.style.display !== 'none';
+  var bannerH = bannerVis ? Math.max(60, Number(c.bannerH) || 230) : 0;
+  var capVis = cap && cap.style.display !== 'none';
+  var capH = capVis ? cap.getBoundingClientRect().height : 0;
+  var naturalH = headH + (bannerVis ? gBanner + bannerH : 0) + (capVis ? gCaption + capH : 0);
+  if (naturalH < 100) naturalH = 400;
+  var availW = Math.max(300, window.innerWidth - 36);
+  var availH = Math.max(300, window.innerHeight - 36);
+  var scale = Math.min(availW / baseW, availH / naturalH);
+  scale = Math.max(0.4, Math.min(4.0, scale));
+  applyMetrics(c, scale);
+  layoutCaption();
+}
+function scheduleFitTvStage() {
+  if (!TV_AUTOFIT) return;
+  if (tvFitRaf) cancelAnimationFrame(tvFitRaf);
+  tvFitRaf = requestAnimationFrame(function () { tvFitRaf = 0; fitTvStage(); });
+}
+window.addEventListener('resize', scheduleFitTvStage);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFitTvStage);
 applyCfg({});
 window.addEventListener('message', function (event) {
   if (!TV_PREVIEW_MODE || window.parent === window || event.origin !== location.origin || event.source !== window.parent || !event.data) return;

@@ -11,7 +11,7 @@
 <script src="assets/js/shared/gas-shim.js?v=16.2"></script>
 <title>ร้านสหกรณ์ มช. (CMU CO-OP)</title>
 <link href="assets/css/shared/fonts.css?v=16.2" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/pages/tv.css?v=16.2">
+<link rel="stylesheet" href="assets/css/pages/tv.css?v=16.17">
 <link href="assets/css/shared/a11y.css?v=16.2" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/shared/dashboard-v16.css?v=16.7">
 <script src="assets/js/shared/dashboard-v16.js?v=16.7" defer></script>
@@ -20,6 +20,7 @@
 </head>
 <body data-dashboard="tv"><a class="wcag-skip" href="#wcag-main">ข้ามไปยังเนื้อหาหลัก</a>
 <main class="wrap" id="wcag-main" role="main">
+<div class="tv-stage" id="tvStage">
 <header class="head" data-layout="side" id="head" role="banner">
 <img alt="โลโก้ร้านสหกรณ์ มช." class="logo" id="logo" src="assets/images/logo.png"/>
 <div class="txt">
@@ -31,6 +32,7 @@
 <!-- แบนเนอร์ (จัดการรูปที่หน้า Admin) -->
 <iframe class="frame" id="banner" loading="eager" src="banner.html" title="แบนเนอร์ประชาสัมพันธ์"></iframe>
 <div aria-label="ข้อความประกาศวิ่ง" class="caption" id="caption" role="region"></div>
+</div>
 <!-- ตัวรับสัญญาณเสียงประกาศ/เพลง -->
 <iframe allow="autoplay; fullscreen" class="frame" id="receiver" data-src="receiver.html" title="ระบบรับสัญญาณเสียงประกาศ" hidden></iframe>
 <div class="receiver-preview" id="receiverPreview" hidden><div class="receiver-preview-head">ระบบเสียงประกาศและคิวเพลง</div><div class="receiver-preview-state"><strong>พร้อมรับสัญญาณ</strong><span>ตัวอย่างพื้นที่ส่วนเสียง · พรีวิวไม่เปิดเสียง</span></div></div>
@@ -42,7 +44,7 @@
 </div>
 </footer>
 </main>
-<script src="assets/js/pages/tv.js?v=16.2"></script>
+<script src="assets/js/pages/tv.js?v=16.17"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>
