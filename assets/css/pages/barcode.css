@@ -554,3 +554,7 @@ td.act{white-space:nowrap;min-width:170px}
 .dup-row.is-del .dup-chk{color:var(--bad)}
 .dup-info{flex:1 1 260px;min-width:0}
 .dup-acts{display:flex;gap:6px;flex:0 0 auto}
+
+.dup-row.is-keep{background:#f2fbf5}
+.dup-keep-btn{background:#fff;border-color:var(--ok);color:var(--ok);box-shadow:none}
+.dup-keep-btn.active{background:var(--ok);border-color:var(--ok);color:#fff}

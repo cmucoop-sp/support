@@ -1288,7 +1288,7 @@ if ($('#pqCode')) {
 }
 
 /* ============================ ตรวจเช็ครายการซ้ำ ============================ */
-var DUP = { groups: [], sel: {}, rowsById: {} };
+var DUP = { groups: [], sel: {}, kept: {}, rowsById: {} };
 function dupNormName(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
 function dupBuildGroups(rows) {
   var n = rows.length, parent = new Int32Array(n), reasons = [];
@@ -1345,27 +1345,28 @@ function dupRender() {
   $('#bcDupSummary').textContent = gs.length ? 'พบ ' + gs.length + ' กลุ่ม (' + totalRows + ' รายการ)' : 'ไม่พบรายการซ้ำในระบบ';
   $('#bcDupList').innerHTML = gs.length ? gs.map(function (g, gi) {
     var itemsHtml = g.rows.map(function (row) {
-      var v = row.v || [], id = String(row.r), checked = !!DUP.sel[id];
-      return '<div class="dup-row' + (checked ? ' is-del' : '') + '">' +
+      var v = row.v || [], id = String(row.r), checked = !!DUP.sel[id], kept = !!DUP.kept[id] && !checked;
+      return '<div class="dup-row' + (checked ? ' is-del' : (kept ? ' is-keep' : '')) + '">' +
         '<label class="dup-chk"><input type="checkbox" data-dup-chk="' + esc(id) + '"' + (checked ? ' checked' : '') + '/><span>' + (checked ? 'ลบ' : 'คงไว้') + '</span></label>' +
         '<div class="dup-info"><b>' + esc(v[3]) + '</b>' +
           '<div class="muted" style="font-size:12.5px">หมวด: ' + esc(v[2] || '-') + (v[1] ? ' · คู่ค้า: ' + esc(v[1]) : '') + (v[4] ? ' · ต่อแพ็ค: ' + esc(v[4]) : '') + '</div>' +
           '<div class="bc" style="font-size:12.5px">' + (v[5] ? 'แพ็ค: ' + esc(v[5]) : '') + (v[5] && v[7] ? ' · ' : '') + (v[7] ? 'เดี่ยว: ' + esc(v[7]) : '') + '</div>' +
         '</div>' +
         '<div class="dup-acts">' +
+          '<button type="button" class="btn small dup-keep-btn' + (kept ? ' active' : '') + '" data-dup-keep="' + esc(id) + '">' + (kept ? 'คงไว้ ✓' : 'คงไว้') + '</button>' +
           '<button type="button" class="btn ghost small" data-dup-edit="' + esc(id) + '">แก้ไข</button>' +
           '<button type="button" class="btn danger small" data-dup-del="' + esc(id) + '">ลบทันที</button>' +
         '</div>' +
       '</div>';
     }).join('');
-    return '<div class="dup-group"><div class="dup-group-hd"><b>กลุ่มที่ ' + (gi + 1) + '</b> <span class="tag">' + esc(g.reason) + '</span></div>' + itemsHtml + '</div>';
+    return '<div class="dup-group"><div class="dup-group-hd"><b>กลุ่มที่ ' + (gi + 1) + '</b> <span class="tag">' + esc(g.reason) + '</span><button type="button" class="btn small dup-keep-btn" style="margin-left:auto" data-dup-keep-grp="' + gi + '">คงไว้ทั้งกลุ่ม</button></div>' + itemsHtml + '</div>';
   }).join('') : '<div class="muted" style="text-align:center;padding:24px">ไม่พบรายการที่มีเลขบาร์หรือชื่อซ้ำกันในระบบ</div>';
   dupUpdateDelBtn();
 }
 async function dupScan() {
   $('#bcDupSummary').textContent = 'กำลังสแกนรายการทั้งหมด…';
   $('#bcDupList').innerHTML = '<div class="muted" style="text-align:center;padding:24px">กำลังตรวจสอบ…</div>';
-  DUP.sel = {}; DUP.rowsById = {};
+  DUP.sel = {}; DUP.kept = {}; DUP.rowsById = {};
   try {
     var rows = await pqEnsureAll(true);
     rows.forEach(function (r) { DUP.rowsById[String(r.r)] = r; });
@@ -1386,23 +1387,40 @@ if ($('#bcDupClose')) $('#bcDupClose').addEventListener('click', function () { $
 if ($('#bcDupReloadBtn')) $('#bcDupReloadBtn').addEventListener('click', dupScan);
 if ($('#bcDupAutoSelBtn')) {
   $('#bcDupAutoSelBtn').addEventListener('click', function () {
-    DUP.sel = {};
+    DUP.sel = {}; DUP.kept = {};
     DUP.groups.forEach(function (g) {
+      if (g.rows.length) DUP.kept[String(g.rows[0].r)] = true;
       for (var i = 1; i < g.rows.length; i++) DUP.sel[String(g.rows[i].r)] = true;
     });
     dupRender();
   });
 }
 if ($('#bcDupClearSelBtn')) {
-  $('#bcDupClearSelBtn').addEventListener('click', function () { DUP.sel = {}; dupRender(); });
+  $('#bcDupClearSelBtn').addEventListener('click', function () { DUP.sel = {}; DUP.kept = {}; dupRender(); });
 }
 if ($('#bcDupList')) {
   $('#bcDupList').addEventListener('change', function (e) {
     var cb = e.target.closest('input[data-dup-chk]'); if (!cb) return;
-    if (cb.checked) DUP.sel[cb.dataset.dupChk] = true; else delete DUP.sel[cb.dataset.dupChk];
+    if (cb.checked) { DUP.sel[cb.dataset.dupChk] = true; delete DUP.kept[cb.dataset.dupChk]; }
+    else delete DUP.sel[cb.dataset.dupChk];
     dupRender();
   });
   $('#bcDupList').addEventListener('click', async function (e) {
+    var kgb = e.target.closest('button[data-dup-keep-grp]');
+    if (kgb) {
+      var g = DUP.groups[Number(kgb.dataset.dupKeepGrp)]; if (!g) return;
+      g.rows.forEach(function (r) { var id = String(r.r); delete DUP.sel[id]; DUP.kept[id] = true; });
+      dupRender();
+      return;
+    }
+    var kb = e.target.closest('button[data-dup-keep]');
+    if (kb) {
+      var kid = kb.dataset.dupKeep;
+      delete DUP.sel[kid];
+      if (DUP.kept[kid]) delete DUP.kept[kid]; else DUP.kept[kid] = true;
+      dupRender();
+      return;
+    }
     var eb = e.target.closest('button[data-dup-edit]');
     if (eb) {
       var r = DUP.rowsById[eb.dataset.dupEdit]; if (!r) return;
