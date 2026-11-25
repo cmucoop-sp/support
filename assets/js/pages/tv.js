@@ -25,7 +25,7 @@ var TEXT = {
 };
 var $ = function (id) { return document.getElementById(id); };
 /* ข้อความไหล: ข้อความเดียว เริ่มนอกขอบขวา เลื่อนพ้นขอบซ้ายแล้ววนเริ่มใหม่ */
-var capText = '', capSpeed = 80, capPaused = false;
+var capText = '', capSpeed = 80, capPaused = false, tvCurScale = 1;
 function setCaption(t) {
   t = t || '';
   var el = $('caption'), btn = $('capToggle');
@@ -42,7 +42,7 @@ function layoutCaption() {
   var el = $('caption'), tr = el.firstChild; if (!capText || !tr) return;
   var cw = el.clientWidth || 760, w = tr.getBoundingClientRect().width || 1;
   tr.style.setProperty('--cw', cw + 'px');
-  tr.style.setProperty('--dur', ((cw + w) / Math.max(10, capSpeed)).toFixed(2) + 's');
+  tr.style.setProperty('--dur', ((cw + w) / (Math.max(10, capSpeed) * (TV_AUTOFIT ? tvCurScale : 1))).toFixed(2) + 's');
 }
 $('capToggle').addEventListener('click', function () {
   capPaused = !capPaused;
@@ -190,27 +190,35 @@ function applyMetrics(c, scale) {
   });
 }
 var tvFitRaf = 0;
-function fitTvStage() {
-  if (!TV_AUTOFIT) { layoutCaption(); return; }
-  var c = TV_LAST_CFG || {};
-  applyMetrics(c, 1);
+function measureStageHeight(c, s) {
   var head = $('head'), banner = $('banner'), cap = $('caption');
-  var baseW = Math.max(320, Number(c.width) || 760);
   var baseGap = (c.gap === undefined || c.gap === null) ? 14 : Number(c.gap);
   var gBanner = (c.gapBanner === null || c.gapBanner === undefined || c.gapBanner === '') ? baseGap : Number(c.gapBanner);
   var gCaption = (c.gapCaption === null || c.gapCaption === undefined || c.gapCaption === '') ? baseGap : Number(c.gapCaption);
   var headH = head ? head.getBoundingClientRect().height : 0;
   var bannerVis = banner && banner.style.display !== 'none';
-  var bannerH = bannerVis ? Math.max(60, Number(c.bannerH) || 230) : 0;
+  var bannerH = bannerVis ? banner.getBoundingClientRect().height : 0;
   var capVis = cap && cap.style.display !== 'none';
   var capH = capVis ? cap.getBoundingClientRect().height : 0;
-  var naturalH = headH + (bannerVis ? gBanner + bannerH : 0) + (capVis ? gCaption + capH : 0);
+  return headH + (bannerVis ? gBanner * s + bannerH : 0) + (capVis ? gCaption * s + capH : 0);
+}
+function fitTvStage() {
+  if (!TV_AUTOFIT) { tvCurScale = 1; layoutCaption(); return; }
+  var c = TV_LAST_CFG || {};
+  applyMetrics(c, 1);
+  var baseW = Math.max(320, Number(c.width) || 760);
+  var naturalH = measureStageHeight(c, 1);
   if (naturalH < 100) naturalH = 400;
   var availW = Math.max(300, window.innerWidth - 36);
   var availH = Math.max(300, window.innerHeight - 36);
-  var scale = Math.min(availW / baseW, availH / naturalH);
-  scale = Math.max(0.4, Math.min(4.0, scale));
+  var scale = Math.max(0.4, Math.min(4.0, Math.min(availW / baseW, availH / naturalH)));
   applyMetrics(c, scale);
+  var actualH = measureStageHeight(c, scale);
+  if (actualH > availH) {
+    scale = Math.max(0.4, scale * (availH / actualH) * 0.985);
+    applyMetrics(c, scale);
+  }
+  tvCurScale = scale;
   layoutCaption();
 }
 function scheduleFitTvStage() {
