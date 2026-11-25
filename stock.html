@@ -68,7 +68,7 @@
 <div class="muted" style="margin-bottom:5px">ซ่อนสินค้าในแท็ก</div>
 <div class="chk-row" id="fHideChecks"></div>
 </div></details></section><section class="kpis" id="kpis"></section><nav class="workspace-nav" role="tablist" aria-label="มุมมองstock"><button type="button" role="tab" id="ws-stock-tab-items" data-work-tab="items" aria-controls="ws-stock-items" aria-selected="true" tabindex="0">รายการสินค้า</button><button type="button" role="tab" id="ws-stock-tab-overview" data-work-tab="overview" aria-controls="ws-stock-overview" aria-selected="false" tabindex="-1">ภาพรวมและแนวโน้ม</button><button type="button" role="tab" id="ws-stock-tab-analysis" data-work-tab="analysis" aria-controls="ws-stock-analysis" aria-selected="false" tabindex="-1">วิเคราะห์และรายการตัดออก</button></nav><div class="workspace-pane" role="tabpanel" id="ws-stock-items" aria-labelledby="ws-stock-tab-items" data-work-pane="items"><section class="card">
-<div class="cardhead"><h3>รายการสินค้า <small id="dtNote"></small></h3></div>
+<div class="cardhead"><h3>รายการสินค้า <small id="dtNote"></small></h3><label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--steel);font-weight:600;margin:0">เรียงตาม<select id="dtSort" aria-label="เรียงลำดับรายการสินค้า" style="width:auto;min-width:210px"><option value="vc:-1">มูลค่าทุน (มาก → น้อย)</option><option value="vc:1">มูลค่าทุน (น้อย → มาก)</option><option value="days:-1">ค้างนานสุดก่อน (วันมาก → น้อย)</option><option value="days:1">ค้างน้อยสุดก่อน (วันน้อย → มาก)</option><option value="qty:-1">คงเหลือ (มาก → น้อย)</option><option value="qty:1">คงเหลือ (น้อย → มาก)</option><option value="cost:-1">ต้นทุน/หน่วย (มาก → น้อย)</option><option value="cost:1">ต้นทุน/หน่วย (น้อย → มาก)</option><option value="price:-1">ราคาขาย (มาก → น้อย)</option><option value="price:1">ราคาขาย (น้อย → มาก)</option><option value="last:-1">ขายล่าสุด (ใหม่ → เก่า)</option><option value="last:1">ขายล่าสุด (เก่า → ใหม่)</option><option value="recv:-1">รับเข้า (ใหม่ → เก่า)</option><option value="recv:1">รับเข้า (เก่า → ใหม่)</option><option value="sk:1">ช่วงอายุสินค้า (DS → T1)</option><option value="sk:-1">ช่วงอายุสินค้า (T1 → DS)</option><option value="name:1">ชื่อสินค้า (ก–ฮ / A–Z)</option><option value="name:-1">ชื่อสินค้า (ฮ–ก / Z–A)</option><option value="g:1">หมวด (A → Z)</option><option value="g:-1">หมวด (Z → A)</option><option value="code:1">รหัสสินค้า (น้อย → มาก)</option><option value="code:-1">รหัสสินค้า (มาก → น้อย)</option><option value="br:1">สาขา (A → Z)</option><option value="br:-1">สาขา (Z → A)</option></select></label></div>
 <div class="tscroll"><table id="dt"></table></div>
 <div class="pager"><span class="muted" id="pgInfo"></span><button class="btn ghost small" id="pgPrev">ก่อนหน้า</button><button class="btn ghost small" id="pgNext">ถัดไป</button></div>
 </section><section class="card" hidden="" id="zeroCard">
@@ -312,7 +312,7 @@
 </div>
 </div>
 <div aria-label="จัดการแท็กสินค้า" class="dot-pop hidden" id="dotPop" role="dialog"></div>
-<script src="assets/js/pages/stock.js?v=16.2"></script>
+<script src="assets/js/pages/stock.js?v=16.16"></script>
 <script src="assets/js/shared/a11y.js?v=16.2"></script>
 </body>
 </html>

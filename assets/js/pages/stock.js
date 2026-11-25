@@ -985,6 +985,7 @@ function renderTable(S) {
   LAST_RAW = S.filter(function (x) { return !x.isZero && !x.isFullCut; });
   if (!LAST_RAW.length && S.length && Object.keys(F.tags || {}).length > 0) LAST_RAW = S.slice();
   LAST_S = sortedItems(S);
+  if ($('#dtSort')) { var sv = F.ds.k + ':' + (F.ds.d > 0 ? 1 : -1); if ($('#dtSort').value !== sv && $('#dtSort').querySelector('option[value="' + sv + '"]')) $('#dtSort').value = sv; }
   var pages = Math.max(1, Math.ceil(LAST_S.length / PAGE)); if (F.page >= pages) F.page = pages - 1;
   var from = F.page * PAGE, part = LAST_S.slice(from, from + PAGE);
   var nPos = S.filter(function (x) { return x.qty > 0; }).length;
@@ -1716,6 +1717,7 @@ $('#dt').addEventListener('click', function (e) {
   var th = e.target.closest('th'); if (!th) return;
   var k = th.dataset.k; if (k === '_act') return; F.ds = { k: k, d: F.ds.k === k ? -F.ds.d : ((k === 'qty' || k === 'vc' || k === 'cost' || k === 'price' || k === 'days' || k === 'last') ? -1 : 1) }; F.page = 0; render();
 });
+if ($('#dtSort')) $('#dtSort').addEventListener('change', function () { var p = String(this.value || 'vc:-1').split(':'); F.ds = { k: p[0] || 'vc', d: Number(p[1]) > 0 ? 1 : -1 }; F.page = 0; render(); });
 $('#pgPrev').addEventListener('click', function () { F.page--; render(); $('#dt').scrollIntoView({ block: 'start' }); });
 $('#pgNext').addEventListener('click', function () { F.page++; render(); $('#dt').scrollIntoView({ block: 'start' }); });
 $('#bReload').addEventListener('click', function () { busy(this, load); });
